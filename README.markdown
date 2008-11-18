@@ -19,3 +19,4 @@ It's easy to run your own instance.  You'll need:
 * [douban-python](http://code.google.com/p/douban-python/)
 * [web.py](http://webpy.org/) (using 0.3 svn)
 
+Inspired by [Whatsup](http://github.com/dustin/whatsup/tree/master).
