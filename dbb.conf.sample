@@ -1,0 +1,15 @@
+[general]
+db: sqlite:///doubanBot.sqlite3
+auth_timeout: 10
+auth_url: http://labs.geowhy.org/douban/auth
+batch_concurrency: 2
+watch_freq: 5
+loop_sleep: 60
+admins: tsing@jabber.org
+api_key: 00000000
+api_secret: c61945
+api_server: api.douban.com
+
+[xmpp]
+jid: douban@jabber.org/doubanbot
+pass: hahahahaha

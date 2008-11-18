@@ -1,0 +1,5 @@
+dbb.log*
+dbb.conf
+*.sqlite3
+*.pyc
+dbb.pid
