@@ -18,5 +18,6 @@ It's easy to run your own instance.  You'll need:
 * [gdata-python-client](http://code.google.com/p/gdata-python-client/)
 * [douban-python](http://code.google.com/p/douban-python/)
 * [web.py](http://webpy.org/) (using 0.3 svn)
+* [mxDateTime](http://www.egenix.com/products/python/mxBase/mxDateTime/)
 
 Inspired by [Whatsup](http://github.com/dustin/whatsup/tree/master).
