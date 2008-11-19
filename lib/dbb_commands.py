@@ -4,6 +4,7 @@ import re
 import sre_constants
 
 from twisted.words.xish import domish
+from twisted.internet import threads
 from sqlalchemy.orm import exc
 from dbb_douban import DoubanClient
 
@@ -168,6 +169,28 @@ class UnwatchCommand(WatchRequired):
 #__register(UnwatchCommand)
 
 class SayCommand(ArgRequired):
+    def __init__(self):
+        super(SayCommand, self).__init__('say', 'Say something.')
+
+    def process(self, user, prot, args, session):
+        if args:
+            jid_full = user.get_jid_full()
+            uid = user.uid
+            key = user.key
+            secret = user.secret
+            def callback(value):
+                if value is True:
+                    prot.send_plain(jid_full, "OK, you said: %s" %args)
+                else:
+                   prot.send_plain(jid_full, "Error, send: %s failed" %args) 
+            def add():
+                return DoubanClient.addBroadcasting(uid, key, secret, args)
+            d = threads.deferToThread(add)
+            d.addCallback(callback)
+        else:
+            prot.send_plain(user.get_jid_full(), "You say nothing :(")
+
+class SayCommand1(ArgRequired):
     
     def __init__(self):
         super(SayCommand, self).__init__('say', 'Say something.')

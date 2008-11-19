@@ -1,6 +1,7 @@
 import sys
 import douban
 import atom
+import gdata
 from douban.service import DoubanService
 from douban.client import OAuthClient
 from twisted.internet import defer
@@ -14,56 +15,39 @@ class DoubanClient(object):
 
     @staticmethod
     def addBroadcasting(uid, key, secret, text):
-        d = defer.Deferred()
         service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
-            d.errback(ValueError("invalid access_key access_secret"))
-            return d
+            return False
+        ret = False
         try:
-            entry = douban.BroadcastingEntry() 
+            entry = douban.BroadcastingEntry()
             entry.content = atom.Content(text = text)
             service.AddBroadcasting("/miniblog/saying", entry)
-            d.callback(entry)
+            ret = True
+        except gdata.service.RequestError, req :
+            print "Error, addBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])   
         except:
-            d.errback(ValueError("send broadcasting failed"))
+            print "Error, addBroadcasting for user: %s failed, unexpected error" %uid
         finally:
-            return d
-
-    @staticmethod
-    def getContactsBroadcasting1(uid, key, secret):
-        d = defer.Deferred()
-        service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
-        if not service.ProgrammaticLogin(key, secret):
-            d.errback(ValueError("invalid access_key access_secret"))
-            return d
-        uri = "/people/%s/miniblog/contacts" %uid
-        try:
-            feed = service.GetContactsBroadcastingFeed(uri)
-            d.callback(feed)
-        except:
-            d.errback(ValueError("get contacts broadcasting failed"))
-        finally:
-            return d
-        
+            return ret
 
     @staticmethod
     def getContactsBroadcasting(uid, key, secret):
-        d = defer.Deferred()
         service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
-        #print "key %s secret %s" %(dbb_config.API_KEY, dbb_config.API_SECRET)
-        #print "access key %s secret %s" %(user.key, user.secret)
         if not service.ProgrammaticLogin(key, secret):
-            d.errback(ValueError("invalid access_key access_secret"))
-            return d
-        # what the hell!
+            return False
         uri = "/people/%s/miniblog/contacts" %uid.encode('utf-8')
-        try: 
+        ret = False
+        try:
             feed = service.GetContactsBroadcastingFeed(uri)
-            d.callback(feed)
+            ret = feed
+        except gdata.service.RequestError, req:
+            print "Error, getContactsBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
         except:
-            d.errback(ValueError("get contacts broadcasting failed"))
+            print "Error, getContactsBroadcasting for user: %s failed, unexpected error"
         finally:
-            return d
+            return ret
+        
     
 
 if __name__ == '__main__':
