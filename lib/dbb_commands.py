@@ -8,6 +8,7 @@ from sqlalchemy.orm import exc
 from dbb_douban import DoubanClient
 
 import models
+import dbb_config
 
 all_commands={}
 
@@ -95,6 +96,26 @@ class WatchRequired(BaseCommand):
 
     def process(self, user, prot, watch, args, session):
         raise NotImplementedError()
+
+class ReauthCommand(BaseCommand):
+    
+    def __init__(self):
+        super(ReauthCommand, self).__init__('reauth', 'Re Authorise.')
+
+    def __call__(self, user, prot, args, session):
+        hash = models.Authen.gen_authen_code(user.jid, session)
+        link = "%s/%s" %(dbb_config.AUTH_URL, hash)
+        message = "Please use the link below to authorise the bot for fetching your douban data:\n%s" %link
+        try:
+            prot.send_plain(user.jid_full, message)
+            user.auth = False
+            session.add(user)
+            session.commit()
+        except:
+            print "reauth user: user.jid failed" 
+
+__register(ReauthCommand)
+
 
 class StatusCommand(BaseCommand):
 
