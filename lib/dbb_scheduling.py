@@ -52,7 +52,10 @@ class DoubanChecker(object):
                     link = re.search('href=\"([^\"]+)\"', entry.content.text.decode('utf-8'))
                     if link and link.group(1): link = " %s" %link.group(1)
                     else: link = ''
-                    msg = "%s\n%s: %s%s" %(msg, author, title, link)
+                    if hasattr(entry, 'attribute'):
+                        for att in entry.attribute:
+                            if att.name == 'comment' and att.text: title = "%s \"%s\"" %(title, att.text.decode('utf-8'))
+                    msg = "%s\n%s:  %s%s" %(msg, author, title, link)
             if not user.is_quiet() and msg != '':
                 self.client.send_plain(user.get_jid_full(), msg)
             session.add(user) 
