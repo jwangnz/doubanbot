@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from twisted.internet import task
 from twisted.words.xish import domish
 from twisted.words.protocols.jabber.jid import JID
@@ -36,14 +34,10 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
     def update_presence(self):
         session=models.Session()
         try:
-           ##watching=session.query(models.Watch).count()
            users=session.query(models.User).count()
-           #if watching != self._watching or users != self._users:
            if users != self._users:
-                ##status="Watching %s URLs for %s users" % (watching, users)
-                status = "Working for %s users" %users
+                status = "Working for %s users, type help for usage info" %users
                 self.available(None, None, {None: status})
-                ##self._watching = watching
                 self._users = users
         finally:
             session.close()
