@@ -113,7 +113,7 @@ class ReauthCommand(BaseCommand):
             session.add(user)
             session.commit()
         except:
-            print "reauth user: user.jid failed" 
+            print "Oops, reauth user: user.jid failed" 
 
 __register(ReauthCommand)
 
@@ -182,10 +182,10 @@ class SayCommand(ArgRequired):
             key = user.key
             secret = user.secret
             def callback(value):
-                if value is True:
-                    prot.send_plain(jid_full, "OK, you said: %s" %args)
+                if value:
+                    prot.send_plain(jid_full, "OK, miniblog %s: '%s' added.\nyou could use command: 'delete %s' to delete it" %(value, args, value))
                 else:
-                   prot.send_plain(jid_full, "Error, send: %s failed" %args) 
+                   prot.send_plain(jid_full, "Oops, send: %s failed" %args) 
             def add():
                 return DoubanClient.addBroadcasting(uid, key, secret, args)
             d = threads.deferToThread(add)
@@ -193,25 +193,35 @@ class SayCommand(ArgRequired):
         else:
             prot.send_plain(user.get_jid_full(), "You say nothing :(")
 
-class SayCommand1(ArgRequired):
-    
+__register(SayCommand)
+
+class DeleteCommand(ArgRequired):
     def __init__(self):
-        super(SayCommand, self).__init__('say', 'Say something.')
+        super(DeleteCommand, self).__init__('delete', 'Delete broadcasting.')
 
     def process(self, user, prot, args, session):
         if args:
-            def onSuccess(value):
-                prot.send_plain(user.get_jid_full(), "OK, you said: %s" %args) 
-            def onError(err):
-                prot.send_plain(user.get_jid_full(), "Error, send: %s failed" %args)
-                print "addBroadcasting failed: %s" %str(err)
-            DoubanClient.addBroadcasting(user.uid, user.key, user.secret, args).addCallbacks(
-                callback=onSuccess,
-                errback=lambda err: onError(err))
-        else:
-            prot.send_plain(user.get_jid_full(), "You say nothing :(")
+            args = args.strip()
+            if not re.match('^\d+$', args):
+                return prot.send_plain(user.get_jid_full(), "You should specify a numeric broadcasting id")
+            jid_full = user.get_jid_full()
+            uid = user.uid
+            key = user.key
+            secret = user.secret
+            def callback(value):
+                if value:
+                    prot.send_plain(jid_full, "OK, miniblog %s deleted" %args)
+                else: 
+                    prot.send_plain(jid_full, "Oops, delete broadcasting %s failed" %args)
 
-__register(SayCommand)
+            def delete():
+                return DoubanClient.delBroadcasting(uid, key, secret, args)
+            d = threads.deferToThread(delete)
+            d.addCallback(callback)
+        else:
+            prot.send_plain(user.get_jid_full(), "You should specify the broadcasting id for deletion")
+
+__register(DeleteCommand)
 
 class OnCommand(BaseCommand):
     def __init__(self):

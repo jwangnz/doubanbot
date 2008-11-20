@@ -1,4 +1,4 @@
-import sys
+import sys, re
 import douban
 import atom
 import gdata
@@ -14,6 +14,38 @@ class DoubanClient(object):
         pass
 
     @staticmethod
+    def entryID(entry):
+        if not isinstance(entry, gdata.GDataEntry):
+            return False
+        if hasattr(entry, 'id'):
+            id = re.search('^.*\/(\d+)$', entry.id.text)
+            if id:
+                return id.group(1)
+            else:
+                print "Error: cannot get entry numeric id by regexp, entry: %s" %entry.id.text
+        else:
+            print "Error: the entry has no attribute: id"
+        return False
+            
+
+    @staticmethod
+    def delBroadcasting(uid, key, secret, id): 
+        service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
+        if not service.ProgrammaticLogin(key, secret):
+            return False
+        entry = douban.BroadcastingEntry()
+        entry.id = atom.Id(text = "http://api.douban.com/miniblog/%s" %id.encode('utf-8'))
+        try:
+            ret = service.DeleteBroadcasting(entry)
+        except gdata.service.RequestError, req: 
+            print "Error, addBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
+        except:
+            print "Error, delBroadcasting %s for user: %s failed, unexpected error" %(uid, id)
+        finally:
+            return ret
+            
+    
+    @staticmethod
     def addBroadcasting(uid, key, secret, text):
         service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
@@ -22,8 +54,12 @@ class DoubanClient(object):
         try:
             entry = douban.BroadcastingEntry()
             entry.content = atom.Content(text = text)
-            service.AddBroadcasting("/miniblog/saying", entry)
-            ret = True
+            feed = service.AddBroadcasting("/miniblog/saying", entry)
+            if type(feed) is douban.BroadcastingEntry:
+                ret = DoubanClient.entryID(feed)     
+            else:
+                print "Error: addBroadcasting returns unexpected result, type: %s" %type(feed)
+                ret = False
         except gdata.service.RequestError, req :
             print "Error, addBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])   
         except:
