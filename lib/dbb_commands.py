@@ -219,7 +219,7 @@ class OnCommand(BaseCommand):
 
     def __call__(self, user, prot, args, session):
         user.active=True
-        prot.send_plain(user.jid_full, "Enabled notify.")
+        prot.send_plain(user.jid_full, "Notify enabled.")
 
 __register(OnCommand)
 
@@ -229,13 +229,13 @@ class OffCommand(BaseCommand):
 
     def __call__(self, user, prot, args, session):
         user.active=False
-        prot.send_plain(user.jid_full, "Disabled notify.")
+        prot.send_plain(user.jid_full, "Notify disabled.")
 
 __register(OffCommand)
 
 class QuietCommand(ArgRequired):
     def __init__(self):
-        super(QuietCommand, self).__init__('quiet', 'Temporarily quiet alerts.')
+        super(QuietCommand, self).__init__('quiet', 'Temporarily quiet broadcastings.')
         self.extended_help="""Quiet alerts for a period of time.
 
 Available time units:  m, h, d
