@@ -5,6 +5,7 @@ from mx import DateTime
 import models
 import dbb_config
 from dbb_douban import DoubanClient
+import douban
 
 from twisted.internet import defer, threads
 
@@ -25,10 +26,21 @@ class DoubanChecker(object):
         def getFeed():
             return DoubanClient.getContactsBroadcasting(uid, key, secret)
         def callback(feed):
-            if feed is False:
-                print "Error: fetching user: %s contacts broadcasting feed failed" %uid
-            else:
+            if type(feed) is douban.BroadcastingFeed:
                 self.onSuccess(jid, uid, key, secret, feed)
+            elif feed is None:
+                try:
+                    session = models.Session()
+                    user = models.User.by_jid(jid, session)
+                    user.uid = jid
+                    user.name = jid
+                    user.auth = False
+                    session.add(user)
+                    session.commit()
+                    session.close()
+                    print "Authorization status of jid: %s user: %s changed to False" %(jid, uid)
+                except:
+                    print "Error: change authorization status of jid: %s user: %s to False failed " %(jid, uid)
         d = threads.deferToThread(getFeed) 
         d.addCallback(callback)
         return d
