@@ -8,7 +8,7 @@ import ConfigParser
 import commands
 
 CONF = ConfigParser.ConfigParser()
-CONF.read('dbb.conf')
+CONF.read('/home/tsing/www/labs.geowhy.org/douban/dbb.conf')
 SCREEN_NAME = CONF.get('xmpp', 'jid')
 #VERSION = commands.getoutput("git describe").strip()
 

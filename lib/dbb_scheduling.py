@@ -28,12 +28,12 @@ class DoubanChecker(object):
             if feed is False:
                 print "Error: fetching user: %s contacts broadcasting feed failed" %uid
             else:
-                self.onSucess(jid, uid, key, secret, feed)
+                self.onSuccess(jid, uid, key, secret, feed)
         d = threads.deferToThread(getFeed) 
         d.addCallback(callback)
         return d
 
-    def onSucess(self, jid, uid, key, secret, feed):
+    def onSuccess(self, jid, uid, key, secret, feed):
         print "Success fetch broadcasting feed of user: %s" %uid
         feed.entry.reverse()
         try:
@@ -54,10 +54,12 @@ class DoubanChecker(object):
                     else: link = ''
                     if hasattr(entry, 'attribute'):
                         for att in entry.attribute:
-                            if att.name == 'comment' and att.text: title = "%s \"%s\"" %(title, att.text.decode('utf-8'))
+                            if att.name == 'comment' and att.text: title = "%s  \"%s\"" %(title, att.text.decode('utf-8'))
                     msg = "%s\n%s:  %s%s" %(msg, author, title, link)
+            msg = msg.lstrip("\n")
             if not user.is_quiet() and msg != '':
                 self.client.send_plain(user.get_jid_full(), msg)
+            user.last_check = datetime.datetime.now()
             session.add(user) 
             session.commit()
         finally:

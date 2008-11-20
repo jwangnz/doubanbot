@@ -36,7 +36,7 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
         try:
            users=session.query(models.User).count()
            if users != self._users:
-                status = "Working for %s users, type help for usage info" %users
+                status = "Working for %s users, Type 'help' for avaiable commands" %users
                 self.available(None, None, {None: status})
                 self._users = users
         finally:
@@ -76,7 +76,7 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
         return user;
 
     def onMessage(self, msg):
-        if hasattr(msg, "type") and msg["type"] == 'chat' and hasattr(msg, "body") and msg.body:
+        if hasattr(msg, 'type') and msg['type'] == 'chat' and hasattr(msg, "body") and msg.body:
             self.typing_notification(msg['from'])
             session = models.Session()
             user = self.get_user(msg, session)
@@ -99,7 +99,7 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
                     finally:
                         session.close()
                 else:
-                    self.send_plain(msg['from'], 'No such command: ' + a[0])
+                    self.send_plain(msg['from'], "No such command: %s, Type 'help' for avaiable commands" %a[0])
             self.update_presence()
 
     # presence stuff
