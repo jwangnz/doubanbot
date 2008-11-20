@@ -131,6 +131,9 @@ class StatusCommand(BaseCommand):
             % {True: 'Active', False: 'Inactive'}[user.active])
         if user.is_quiet():
             rv.append("All alerts are quieted until %s" % str(user.quiet_until))
+        if user.jid in dbb_config.ADMINS:
+            auth_user = session.query(models.User).filter_by(auth=True).count()
+            rv.append("Authorized user: %s" %auth_user)
         prot.send_plain(user.jid_full, "\n".join(rv))
 
 __register(StatusCommand)
