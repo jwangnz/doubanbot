@@ -12,7 +12,7 @@ can do.
 
 It's easy to run your own instance.  You'll need: 
 
-* [Twisted](http://twistedmatrix.com/trac/) (specifically names, web, and words)
+* [Twisted](http://twistedmatrix.com/trac/) (specifically names and words)
 * [SQLAlchemy](http://www.sqlalchemy.org/) 
 * [Wokkel](http://wokkel.ik.nu/)
 * [gdata-python-client](http://code.google.com/p/gdata-python-client/)
