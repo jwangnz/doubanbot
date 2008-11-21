@@ -1,12 +1,12 @@
 import sys, re
-import douban
 import atom
 import gdata
+import douban
 from douban.service import DoubanService
 from douban.client import OAuthClient
 from twisted.internet import defer
 from models import *
-import _config
+from doubanbot import config
 
 class DoubanClient(object):
 
@@ -26,7 +26,7 @@ class DoubanClient(object):
         else:
             print "Error: the entry has no attribute: id"
         return False
-            
+
     @staticmethod
     def addRecommendation(uid, key, secret, title, url, comment=""):
         service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
@@ -65,7 +65,7 @@ class DoubanClient(object):
 
     @staticmethod
     def delBroadcasting(uid, key, secret, id):
-        service = DoubanService(api_key=_config.API_KEY, secret=_config.API_SECRET)
+        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
             return False
         ret = False
@@ -83,7 +83,7 @@ class DoubanClient(object):
 
     @staticmethod
     def addBroadcasting(uid, key, secret, text):
-        service = DoubanService(api_key=_config.API_KEY, secret=_config.API_SECRET)
+        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
             return False
         ret = False
@@ -105,7 +105,7 @@ class DoubanClient(object):
 
     @staticmethod
     def getContactsBroadcasting(uid, key, secret):
-        service = DoubanService(api_key=_config.API_KEY, secret=_config.API_SECRET)
+        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
             return False
         uri = "/people/%s/miniblog/contacts" %uid.encode('utf-8')

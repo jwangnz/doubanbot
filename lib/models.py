@@ -2,7 +2,7 @@ from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, mapper, relation, backref, exc
 import hashlib, time, random, datetime
 
-import config
+from doubanbot import config
 
 _engine = create_engine(config.CONF.get('general', 'db'), echo=False)
 _metadata = MetaData()

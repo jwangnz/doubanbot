@@ -4,7 +4,7 @@ from mx import DateTime
 
 import models
 import config
-from douban import DoubanClient
+from doubanapi import DoubanClient
 import douban
 
 from twisted.internet import defer, threads

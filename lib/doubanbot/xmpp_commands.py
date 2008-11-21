@@ -6,7 +6,7 @@ import sre_constants
 from twisted.words.xish import domish
 from twisted.internet import threads
 from sqlalchemy.orm import exc
-from douban import DoubanClient
+from doubanapi import DoubanClient
 
 import models
 import config

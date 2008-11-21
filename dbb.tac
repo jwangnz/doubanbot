@@ -1,15 +1,16 @@
 import sys
 sys.path.append("lib")
 
+import commands
 from twisted.application import service
 from twisted.internet import task, reactor
 from twisted.words.protocols.jabber import jid
 from wokkel.client import XMPPClient
-#from wokkel.generic import VersionHandler
+from wokkel.generic import VersionHandler
 
-import config
-import protocol
-import scheduling
+from doubanbot import config
+from doubanbot import protocol
+from doubanbot import scheduling
 
 application = service.Application("DoubanBot")
 
@@ -17,7 +18,8 @@ xmppclient = XMPPClient(jid.internJID(config.SCREEN_NAME), config.CONF.get('xmpp
 xmppclient.logTraffic = False
 doubanBot=protocol.DoubanBotProtocol()
 doubanBot.setHandlerParent(xmppclient)
-#VersionHandler('DoubanBot', config.VERSION).setHandlerParent(xmppclient)
+VERSION = commands.getoutput("git describe").strip()
+VersionHandler('DoubanBot', VERSION).setHandlerParent(xmppclient)
 protocol.KeepAlive().setHandlerParent(xmppclient)
 xmppclient.setServiceParent(application)
 

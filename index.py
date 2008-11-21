@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 import sys
+sys.path.append('/data/work/doubanbot')
+sys.path.append('/data/work/doubanbot/lib')
 import os
 import web, douban
 from douban.service import DoubanService
 from douban.client import OAuthClient
 from models import *
+from doubanbot import config
 
 urls = (
  '/douban/', 'index',
@@ -52,7 +55,7 @@ class auth:
             #    return web.internalerror()
             finally:
                 session.close()
-            url = client.get_authorization_url(request_key, request_secret, callback=config.AUTH_URL +'/callback')
+            url = client.get_authorization_url(request_key, request_secret, callback='http://labs.geowhy.org/douban/callback')
             return web.TempRedirect(url)
         else:
             return "request request_key failed"
@@ -131,7 +134,6 @@ class subscribe:
             return "fail %s" %hash
         raise web.seeother("/douban/auth/%s" %hash)
 
-application = web.application(urls, globals(), web.reloader).wsgifunc()
-#app.run()
+application = web.application(urls, globals()).wsgifunc()
 
 
