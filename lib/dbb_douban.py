@@ -14,33 +14,69 @@ class DoubanClient(object):
         pass
 
     @staticmethod
-    def entryID(entry):
+    def entryID(entry, prefix = ''):
         if not isinstance(entry, gdata.GDataEntry):
             return False
         if hasattr(entry, 'id'):
             id = re.search('^.*\/(\d+)$', entry.id.text)
             if id:
-                return id.group(1)
+                return prefix + id.group(1)
             else:
                 print "Error: cannot get entry numeric id by regexp, entry: %s" %entry.id.text
         else:
             print "Error: the entry has no attribute: id"
         return False
             
+    @staticmethod
+    def addRecommendation(uid, key, secret, title, url, comment=""):
+        service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
+        if not service.ProgrammaticLogin(key, secret):
+            return False
+        ret = False
+        try:
+            print "before add reco"
+            entry = service.AddRecommendation(title, url, comment)
+            print "after add reco"
+            if type(entry) is douban.RecommendationEntry: 
+                ret = DoubanClient.entryID(entry, 'R')
+        except gdata.service.RequestError, req:
+            print "Error, addRecommendation for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
+        except:
+            print "Error, addRecommendation title: %s url: %s coment: %s" %(url, comment)
+        finally:
+            return ret
+    
+    @staticmethod
+    def delRecommendation(uid, key, secret, id):
+        service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
+        if not service.ProgrammaticLogin(key, secret):
+            return False
+        ret = False
+        try:
+            entry = douban.RecommendationEntry()
+            entry.id = atom.Id(text = "http://api.douban.com/recommendation/%s" %id.encode('utf-8'))
+            ret = service.DeleteRecommendation(entry)
+        except gdata.service.RequestError, req:
+            print "Error, delRecommendation for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
+        except:
+            print "Error, delRecommendation %s for user: %s failed, unexpected error" %(id, uid)
+        finally:
+            return ret
 
     @staticmethod
     def delBroadcasting(uid, key, secret, id): 
         service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
             return False
+        ret = False
         entry = douban.BroadcastingEntry()
         entry.id = atom.Id(text = "http://api.douban.com/miniblog/%s" %id.encode('utf-8'))
         try:
             ret = service.DeleteBroadcasting(entry)
         except gdata.service.RequestError, req: 
-            print "Error, addBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
+            print "Error, delBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
         except:
-            print "Error, delBroadcasting %s for user: %s failed, unexpected error" %(uid, id)
+            print "Error, delBroadcasting %s for user: %s failed, unexpected error" %(id, uid)
         finally:
             return ret
             
@@ -56,7 +92,7 @@ class DoubanClient(object):
             entry.content = atom.Content(text = text)
             feed = service.AddBroadcasting("/miniblog/saying", entry)
             if type(feed) is douban.BroadcastingEntry:
-                ret = DoubanClient.entryID(feed)     
+                ret = DoubanClient.entryID(feed, 'B') 
             else:
                 print "Error: addBroadcasting returns unexpected result, type: %s" %type(feed)
                 ret = False

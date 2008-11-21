@@ -160,16 +160,38 @@ class HelpCommand(BaseCommand):
 
 __register(HelpCommand)
 
-class UnwatchCommand(WatchRequired):
-
+class RecommendationCommand(ArgRequired):
     def __init__(self):
-        super(UnwatchCommand, self).__init__('unwatch', 'Stop watching a page.')
+        super(RecommendationCommand, self).__init__('reco', 'Recommendation something.')
+        
+    def process(self, user, prot, args, session):
+        if args:
+            re.IGNORECASE = True
+            match = re.search('^(.+)\s(http|https)(\:\/\/[^\/]\S+)(.*)$', args)
+            re.IGNORECASE = False
+            if not match:
+                return prot.send_plain(user.get_jid_full(), "Error, parameter after command 'reco' should be format of: title url comment") 
+            title = match.group(1)
+            url = "%s%s" %(match.group(2), match.group(3))
+            comment = match.group(4)
+            jid_full = user.get_jid_full()
+            uid = user.uid
+            key = user.key
+            secret = user.secret
+            def callback(value): 
+                if value:
+                    prot.send_plain(jid_full, "OK, recommendation %s: '%s' added.\nyou could use command: 'delete %s' to delete it" %(value, args, value))
+                else:
+                    prot.send_plain(jid_full, "Oops, add recommendation: %s failed" %args)
+            def add():
+                return DoubanClient.addRecommendation(uid, key, secret, title, url, comment)
+            d = threads.deferToThread(add)
+            d.addCallback(callback)
+            return d
+        else:
+            prot.send_plain(jid_full, "You recommendate nothing :(")
 
-    def process(self, user, prot, watch, args, session):
-        session.delete(watch)
-        prot.send_plain(user.jid_full, "Stopped watching %s" % watch.url)
-
-#__register(UnwatchCommand)
+__register(RecommendationCommand)
 
 class SayCommand(ArgRequired):
     def __init__(self):
@@ -197,29 +219,37 @@ __register(SayCommand)
 
 class DeleteCommand(ArgRequired):
     def __init__(self):
-        super(DeleteCommand, self).__init__('delete', 'Delete broadcasting.')
+        super(DeleteCommand, self).__init__('delete', 'Delete broadcasting/recommendation.')
 
     def process(self, user, prot, args, session):
         if args:
-            args = args.strip()
-            if not re.match('^\d+$', args):
-                return prot.send_plain(user.get_jid_full(), "You should specify a numeric broadcasting id")
+            args = args.strip().upper()
+            match = re.search('^([RB])(\d+)$', args)
+            if not match:
+                return prot.send_plain(user.get_jid_full(), "Oops, invalid id for delete")
+            type = match.group(1) 
+            if type == 'R': name = 'recommendation'
+            else: name = 'broadcasting'
+            id = match.group(2)
             jid_full = user.get_jid_full()
             uid = user.uid
             key = user.key
             secret = user.secret
             def callback(value):
                 if value:
-                    prot.send_plain(jid_full, "OK, miniblog %s deleted" %args)
+                    prot.send_plain(jid_full, "OK, %s %s deleted" %(name, args))
                 else: 
-                    prot.send_plain(jid_full, "Oops, delete broadcasting %s failed" %args)
+                    prot.send_plain(jid_full, "Oops, delete %s %s failed" %(name, args))
 
             def delete():
-                return DoubanClient.delBroadcasting(uid, key, secret, args)
+                if type == 'B':
+                    return DoubanClient.delBroadcasting(uid, key, secret, id)
+                else:
+                    return DoubanClient.delRecommendation(uid, key, secret, id)
             d = threads.deferToThread(delete)
             d.addCallback(callback)
         else:
-            prot.send_plain(user.get_jid_full(), "You should specify the broadcasting id for deletion")
+            prot.send_plain(user.get_jid_full(), "You should specify the id for deletion")
 
 __register(DeleteCommand)
 
