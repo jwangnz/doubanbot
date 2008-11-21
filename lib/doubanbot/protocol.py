@@ -5,8 +5,8 @@ from wokkel.xmppim import MessageProtocol, PresenceClientProtocol
 from wokkel.xmppim import AvailablePresence
 from wokkel.client import XMPPHandler
 
-import dbb_commands
-import dbb_config
+import xmpp_commands
+import config
 import models
 
 class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
@@ -23,7 +23,7 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
     def connectionMade(self):
         print "Connected!"
 
-        self.commands=dbb_commands.all_commands
+        self.commands=xmpp_commands.all_commands
         print "Loaded commands: ", `self.commands.keys()`
 
         # send initial presence
@@ -50,7 +50,7 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
 
         msg = domish.Element((None, "message"))
         msg["to"] = jid
-        msg["from"] = dbb_config.SCREEN_NAME
+        msg["from"] = config.SCREEN_NAME
         msg.addElement(('jabber:x:event', 'x')).addElement("composing")
 
         self.send(msg)
@@ -58,12 +58,12 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
     def send_plain(self, jid, content):
         msg = domish.Element((None, "message"))
         msg["to"] = jid
-        msg["from"] = dbb_config.SCREEN_NAME
+        msg["from"] = config.SCREEN_NAME
         msg["type"] = 'chat'
         msg.addElement("body", content=content)
 
         self.send(msg)
-         
+
 
     def get_user(self, msg, session):
         jid = JID(msg['from'])
@@ -82,10 +82,10 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
             user = self.get_user(msg, session)
             if user.auth is False:
                 hash = models.Authen.gen_authen_code(user.jid)
-                link = "%s/%s" %(dbb_config.AUTH_URL, hash)
+                link = "%s/%s" %(config.AUTH_URL, hash)
                 message = "Please use the link below to authorise the bot for fetching your douban data:\n%s" %link
                 self.send_plain(msg['from'], message)
-            else: 
+            else:
                 a=unicode(msg.body).split(' ', 1)
                 args = None
                 if len(a) > 1:
@@ -104,7 +104,7 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
 
     # presence stuff
     def availableReceived(self, entity, show=None, statuses=None, priority=0):
-        if entity.userhost() == JID(dbb_config.SCREEN_NAME).userhost():
+        if entity.userhost() == JID(config.SCREEN_NAME).userhost():
             return
         print "Available from %s (%s, %s)" % (entity.full(), show, statuses)
         models.User.update_status(entity.userhost(), show)
@@ -122,12 +122,12 @@ The bot watch you douban contacts' broadcasting for you!
 """
         session = models.Session()
         hash = models.Authen.gen_authen_code(entity.userhost(), session)
-        auth_url = "%s/%s" %(dbb_config.AUTH_URL, hash)
+        auth_url = "%s/%s" %(config.AUTH_URL, hash)
         self.send_plain(entity.full(), "%s\n use the link below to authorise the bot for fetching you douban data:\n\n%s\n" %(welcome_message, auth_url))
         try:
             msg = "New subscriber: %s ( %d )" % (entity.userhost(),
                 session.query(models.User).count())
-            for a in dbb_config.ADMINS:
+            for a in config.ADMINS:
                 self.send_plain(a, msg)
         finally:
             session.close()

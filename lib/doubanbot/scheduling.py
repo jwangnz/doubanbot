@@ -3,8 +3,8 @@ import datetime
 from mx import DateTime
 
 import models
-import dbb_config
-from dbb_douban import DoubanClient
+import config
+from douban import DoubanClient
 import douban
 
 from twisted.internet import defer, threads
@@ -16,8 +16,8 @@ class DoubanChecker(object):
     def __call__(self):
         session = models.Session()
         try:
-            ds = defer.DeferredSemaphore(tokens=dbb_config.BATCH_CONCURRENCY)
-            for user in models.User.to_check(session, dbb_config.WATCH_FREQ):
+            ds = defer.DeferredSemaphore(tokens=config.BATCH_CONCURRENCY)
+            for user in models.User.to_check(session, config.WATCH_FREQ):
                 ds.run(self.__userCheck, user.jid, user.uid, user.key, user.secret)
         finally:
             session.close()
@@ -41,7 +41,7 @@ class DoubanChecker(object):
                     print "Authorization status of jid: %s user: %s changed to False" %(jid, uid)
                 except:
                     print "Error: change authorization status of jid: %s user: %s to False failed " %(jid, uid)
-        d = threads.deferToThread(getFeed) 
+        d = threads.deferToThread(getFeed)
         d.addCallback(callback)
         return d
 
@@ -72,7 +72,7 @@ class DoubanChecker(object):
             if not user.is_quiet() and msg != '':
                 self.client.send_plain(user.get_jid_full(), msg)
             user.last_check = datetime.datetime.now()
-            session.add(user) 
+            session.add(user)
             session.commit()
         finally:
             session.close()

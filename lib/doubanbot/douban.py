@@ -6,11 +6,11 @@ from douban.service import DoubanService
 from douban.client import OAuthClient
 from twisted.internet import defer
 from models import *
-import dbb_config
+import _config
 
 class DoubanClient(object):
-    
-    def __init__(self): 
+
+    def __init__(self):
         pass
 
     @staticmethod
@@ -29,7 +29,7 @@ class DoubanClient(object):
             
     @staticmethod
     def addRecommendation(uid, key, secret, title, url, comment=""):
-        service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
+        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
             return False
         ret = False
@@ -48,7 +48,7 @@ class DoubanClient(object):
     
     @staticmethod
     def delRecommendation(uid, key, secret, id):
-        service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
+        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
             return False
         ret = False
@@ -64,8 +64,8 @@ class DoubanClient(object):
             return ret
 
     @staticmethod
-    def delBroadcasting(uid, key, secret, id): 
-        service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
+    def delBroadcasting(uid, key, secret, id):
+        service = DoubanService(api_key=_config.API_KEY, secret=_config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
             return False
         ret = False
@@ -79,11 +79,11 @@ class DoubanClient(object):
             print "Error, delBroadcasting %s for user: %s failed, unexpected error" %(id, uid)
         finally:
             return ret
-            
-    
+
+
     @staticmethod
     def addBroadcasting(uid, key, secret, text):
-        service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
+        service = DoubanService(api_key=_config.API_KEY, secret=_config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
             return False
         ret = False
@@ -97,7 +97,7 @@ class DoubanClient(object):
                 print "Error: addBroadcasting returns unexpected result, type: %s" %type(feed)
                 ret = False
         except gdata.service.RequestError, req :
-            print "Error, addBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])   
+            print "Error, addBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
         except:
             print "Error, addBroadcasting for user: %s failed, unexpected error" %uid
         finally:
@@ -105,7 +105,7 @@ class DoubanClient(object):
 
     @staticmethod
     def getContactsBroadcasting(uid, key, secret):
-        service = DoubanService(api_key=dbb_config.API_KEY, secret=dbb_config.API_SECRET)
+        service = DoubanService(api_key=_config.API_KEY, secret=_config.API_SECRET)
         if not service.ProgrammaticLogin(key, secret):
             return False
         uri = "/people/%s/miniblog/contacts" %uid.encode('utf-8')
@@ -121,8 +121,8 @@ class DoubanClient(object):
             print "Error, getContactsBroadcasting for user: %s failed, unexpected error"
         finally:
             return ret
-        
-    
+
+
 
 if __name__ == '__main__':
     pass

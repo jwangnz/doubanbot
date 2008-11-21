@@ -13,8 +13,8 @@ urls = (
  '/douban/callback.*', 'callback',
 )
 
-API_KEY=dbb_config.API_KEY
-SECRET=dbb_config.API_SECRET
+API_KEY=config.API_KEY
+SECRET=config.API_SECRET
 TOKEN_KEY=''
 TOKEN_SECRET=''
 PREFIX=''
@@ -52,7 +52,7 @@ class auth:
             #    return web.internalerror()
             finally:
                 session.close()
-            url = client.get_authorization_url(request_key, request_secret, callback=dbb_config.AUTH_URL +'/callback')
+            url = client.get_authorization_url(request_key, request_secret, callback=config.AUTH_URL +'/callback')
             return web.TempRedirect(url)
         else:
             return "request request_key failed"

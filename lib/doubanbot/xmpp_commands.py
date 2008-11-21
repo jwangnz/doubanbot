@@ -6,10 +6,10 @@ import sre_constants
 from twisted.words.xish import domish
 from twisted.internet import threads
 from sqlalchemy.orm import exc
-from dbb_douban import DoubanClient
+from douban import DoubanClient
 
 import models
-import dbb_config
+import config
 
 all_commands={}
 
@@ -99,13 +99,13 @@ class WatchRequired(BaseCommand):
         raise NotImplementedError()
 
 class ReauthCommand(BaseCommand):
-    
+
     def __init__(self):
         super(ReauthCommand, self).__init__('reauth', 'Re Authorise.')
 
     def __call__(self, user, prot, args, session):
         hash = models.Authen.gen_authen_code(user.jid, session)
-        link = "%s/%s" %(dbb_config.AUTH_URL, hash)
+        link = "%s/%s" %(config.AUTH_URL, hash)
         message = "Please use the link below to authorise the bot for fetching your douban data:\n%s" %link
         try:
             prot.send_plain(user.jid_full, message)
@@ -113,7 +113,7 @@ class ReauthCommand(BaseCommand):
             session.add(user)
             session.commit()
         except:
-            print "Oops, reauth user: user.jid failed" 
+            print "Oops, reauth user: user.jid failed"
 
 __register(ReauthCommand)
 
@@ -131,7 +131,7 @@ class StatusCommand(BaseCommand):
             % {True: 'Active', False: 'Inactive'}[user.active])
         if user.is_quiet():
             rv.append("All alerts are quieted until %s" % str(user.quiet_until))
-        if user.jid in dbb_config.ADMINS:
+        if user.jid in config.ADMINS:
             auth_user = session.query(models.User).filter_by(auth=True).count()
             rv.append("Authorized user: %s" %auth_user)
         prot.send_plain(user.jid_full, "\n".join(rv))
@@ -207,7 +207,7 @@ class SayCommand(ArgRequired):
                 if value:
                     prot.send_plain(jid_full, "OK, miniblog %s: '%s' added.\nyou could use command: 'delete %s' to delete it" %(value, args, value))
                 else:
-                   prot.send_plain(jid_full, "Oops, send: %s failed" %args) 
+                   prot.send_plain(jid_full, "Oops, send: %s failed" %args)
             def add():
                 return DoubanClient.addBroadcasting(uid, key, secret, args)
             d = threads.deferToThread(add)
