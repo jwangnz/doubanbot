@@ -24,9 +24,14 @@ protocol.KeepAlive().setHandlerParent(xmppclient)
 xmppclient.setServiceParent(application)
 
 douban_checker = scheduling.DoubanChecker(doubanBot)
+douban_authen = scheduling.AuthChecker(doubanBot)
 # Run this once in a few seconds...
 reactor.callLater(5, douban_checker)
+reactor.callLater(20, douban_authen)
 
 # And do it periodically
 douban_checker_loop = task.LoopingCall(douban_checker)
 douban_checker_loop.start(int(config.CONF.get('general', 'loop_sleep')), False)
+
+douban_authen_loop = task.LoopingCall(douban_authen)
+douban_authen_loop.start(900, False)

@@ -9,6 +9,34 @@ import douban
 
 from twisted.internet import defer, threads
 
+class AuthChecker(object):
+    def __init__(self, client):
+        self.client = client
+
+    def __call__(self):
+        session = models.Session()
+        try:
+            users = session.query(models.User).filter_by(auth=False).all()
+            then = datetime.datetime.now() - datetime.timedelta(hours=24)
+            for user in users:
+                if user.last_check is None or user.last_check < then:
+                    if user.status == 'online':
+                        print "last_check: %s then: %s" %(str(user.last_check), str(then))
+                        print "Sending authorization request to %s" %user.jid
+                        self.__sendMessage(user.jid)
+                        user.last_check = datetime.datetime.now()
+                        session.add(user)
+                        session.commit()
+        finally:
+            session.close()
+
+    def __sendMessage(self, jid):
+        msg = "Welcom to DoubanBot.\nPlease use the link below to authorize the bot for fetching you douban data:\n"
+        hash = models.Authen.gen_authen_code(jid)
+        auth_url = "%s/%s" %(config.AUTH_URL, hash)
+        msg = "%s\n%s" %(msg, auth_url)
+        return self.client.send_plain(jid, msg)
+
 class DoubanChecker(object):
     def __init__(self, client):
         self.client = client
@@ -32,7 +60,7 @@ class DoubanChecker(object):
                 try:
                     session = models.Session()
                     user = models.User.by_jid(jid, session)
-                    user.uid = jid
+                    #user.uid = jid
                     user.name = jid
                     user.auth = False
                     session.add(user)

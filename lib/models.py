@@ -91,11 +91,8 @@ class Authen(object):
         try:
             data = s.query(Authen).filter_by(jid=jid).one()
             timeout_date = datetime.datetime.now() - datetime.timedelta(minutes=int(config.CONF.get('general', 'auth_timeout')))
-            print "DDDDDDDDDDDDDDD last_modified %s timeout_date %s" %(str(data.last_modified), str(timeout_date))
             if data.last_modified and data.last_modified > timeout_date:
                 return data.hash
-            else:
-               print "DDDDDDDDDDDDDDDDDDDDDDD"
         except exc.NoResultFound, e:
             pass
         finally:

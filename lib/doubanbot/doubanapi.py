@@ -115,7 +115,7 @@ class DoubanClient(object):
             ret = feed
         except gdata.service.RequestError, req:
             print "Error, getContactsBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
-            if req[0]['body'].find('Signature does not') != -1:
+            if req[0]['body'].find('no auth') != -1:
                 ret = None
         except:
             print "Error, getContactsBroadcasting for user: %s failed, unexpected error"
