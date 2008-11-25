@@ -25,7 +25,12 @@ PREFIX=''
 
 class index:
     def GET(self):
-        return 'Hey You! Whats up!'
+        return """Welcome to DoubanBot.
+Add douban@jabber.org to your gtalk/xmpp/jabber contacts, then you will get a setup instruction.
+IM 'help' to the bot anytime you need help.
+
+powered by GeoWHY.ORG
+"""
 
 class auth:
     def GET(self, hash):
@@ -120,7 +125,7 @@ class callback:
             session.commit()
         except:
             return "insert user failed"
-        return "OK, authenication of user: %s, jid: %s finished, enjoy it!" %(user.uid, user.jid)
+        return "OK, authorization of user: %s, jid: %s finished.\nIM 'help' to the bot to see what you can do. enjoy it!" %(user.uid, user.jid)
         
 
 class subscribe:
