@@ -17,7 +17,7 @@ class AuthChecker(object):
         session = models.Session()
         try:
             users = session.query(models.User).filter_by(auth=False).all()
-            then = datetime.datetime.now() - datetime.timedelta(hours=24)
+            then = datetime.datetime.now() - datetime.timedelta(hours=48)
             for user in users:
                 if user.last_check is None or user.last_check < then:
                     if user.status == 'online':
