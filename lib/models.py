@@ -70,6 +70,7 @@ class User(object):
         query = """select * from users
                     where users.active = :uactive 
                     and users.auth = :uauth
+                    and users.status != 'unsubscribed'
                     and (users.last_check is null or users.last_check < :ulast_check)
                     limit 50
                 """
