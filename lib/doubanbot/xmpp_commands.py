@@ -134,6 +134,10 @@ class StatusCommand(BaseCommand):
         if user.jid in config.ADMINS:
             auth_user = session.query(models.User).filter_by(auth=True).count()
             rv.append("Authorized user: %s" %auth_user)
+            auth_active_user = session.query(models.User).filter_by(auth=True).filter_by(active=True).count()
+            rv.append("Active user: %s" %auth_active_user)
+            online_user = session.query(models.User).filter_by(auth=True).filter(models.User.status != 'unavailable').filter(models.User.status != 'unsubscribed').count()
+            rv.append("Online user: %s" %online_user)
         prot.send_plain(user.jid_full, "\n".join(rv))
 
 __register(StatusCommand)
