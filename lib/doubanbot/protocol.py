@@ -80,6 +80,9 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
             self.typing_notification(msg['from'])
             session = models.Session()
             user = self.get_user(msg, session)
+            if user.status in ['unavailable', 'offline', 'dnd']:
+                user.status = 'online'
+                session.add(user)
             if user.auth is False:
                 hash = models.Authen.gen_authen_code(user.jid)
                 link = "%s/%s" %(config.AUTH_URL, hash)
