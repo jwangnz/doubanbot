@@ -1,8 +1,9 @@
 #!/usr/bin/env python
-import sys
-sys.path.append('/data/work/doubanbot')
-sys.path.append('/data/work/doubanbot/lib')
-import os
+import sys, os, inspect
+path = os.path.dirname(inspect.currentframe().f_code.co_filename) or '.'
+os.chdir(path)
+sys.path.append(path)
+sys.path.append(os.path.join(path, 'lib'))
 import web, douban
 from douban.service import DoubanService
 from douban.client import OAuthClient
@@ -10,22 +11,16 @@ from models import *
 from doubanbot import config
 
 urls = (
- '/douban/', 'index',
- '/douban/subscribe/([^\/]+)', 'subscribe',
- '/douban/auth/([a-zA-Z0-9]{32})', 'auth',
- '/douban/callback.*', 'callback',
+ '[/]+', 'index',
+ '/subscribe/([^\/]+)', 'subscribe',
+ '/auth/([a-zA-Z0-9]{32})', 'auth',
+ '/callback.*', 'callback',
 )
-
-API_KEY=config.API_KEY
-SECRET=config.API_SECRET
-TOKEN_KEY=''
-TOKEN_SECRET=''
-PREFIX=''
 
 
 class index:
     def GET(self):
-        return """Welcome to DoubanBot.
+        return """Welcome to Douban Bot.
 Add douban@jabber.org to your gtalk/xmpp/jabber contacts, then you will get a setup instruction.
 IM 'help' to the bot anytime you need help.
 
@@ -44,13 +39,12 @@ class auth:
             user = session.query(User).filter_by(jid=authen.jid).one()
         except exc.NoResultFound, e:
             user = False
-            return "DDDDDDDDDDD"
+            return "user not found"
         if user and user.auth is True:
             return "user: %s jid: %s was already authenticated" %(user.uid, user.jid)
             
-        # start the oauth process
-        client = OAuthClient(key=API_KEY, secret=SECRET) 
-        request_key, request_secret = client.get_request_token() 
+        client = OAuthClient(key=config.API_KEY, secret=config.API_SECRET)
+        request_key, request_secret = client.get_request_token()
         if request_key and request_secret:
             try:
                 token = Token(request_key, request_secret, hash)
@@ -60,16 +54,15 @@ class auth:
             #    return web.internalerror()
             finally:
                 session.close()
-            url = client.get_authorization_url(request_key, request_secret, callback='http://labs.geowhy.org/douban/callback')
+            url = client.get_authorization_url(request_key, request_secret, callback=config.AUTH_CALLBACK)
             return web.TempRedirect(url)
         else:
             return "request request_key failed"
 
 class callback:
     def GET(self):
-        client = OAuthClient(key=API_KEY, secret=SECRET) 
-        request_key = web.input().get('oauth_token', False) 
-        print ">> callback token: %s" %request_key
+        client = OAuthClient(key=config.API_KEY, secret=config.API_SECRET)
+        request_key = web.input().get('oauth_token', False)
         session = Session()
         if request_key:
             try:
@@ -78,13 +71,13 @@ class callback:
                 return "request token: %s not found" %request_key
         else:
             return web.internalerror()
-        client = OAuthClient(key=API_KEY, secret=SECRET)
+        client = OAuthClient(key=config.API_KEY, secret=config.API_SECRET)
         access_key, access_secret = client.get_access_token(request_key, token.secret)
         if not access_key or not access_secret:
             return "Error: access_key: %s access_token: %s" %(access_key, access_secret)
         
 	    print "access_key %s, access_secret %s" %(access_key, access_secret)
-        service = DoubanService(api_key=API_KEY, secret=SECRET)
+        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
         
         if not service.ProgrammaticLogin(access_key, access_secret):
             return "service login failed"
@@ -101,14 +94,6 @@ class callback:
             return "jid not found"
 
 
-        # check if the user has bind another jid
-        #try:
-        #    user = session.query(User).filter_by(uid=people.uid.text).one()
-        #    if user.jid != authen.jid:
-        #        return "Faile: the user has already associated with a jid: %s" %user.jid
-        #except:
-        #    pass
-         
         try:
             user = session.query(User).filter_by(jid=authen.jid).one()
             user.uid = people.uid.text
@@ -126,7 +111,6 @@ class callback:
         except:
             return "insert user failed"
         return "OK, authorization of user: %s, jid: %s finished.\nIM 'help' to the bot to see what you can do. enjoy it!" %(user.uid, user.jid)
-        
 
 class subscribe:
     def GET(self, jid):
@@ -137,8 +121,6 @@ class subscribe:
             hash = Authen.gen_authen_code(jid, session)
         if hash is False:
             return "fail %s" %hash
-        raise web.seeother("/douban/auth/%s" %hash)
+        raise web.seeother("%s/%s" %(config.AUTH_URL, hash))
 
 application = web.application(urls, globals()).wsgifunc()
-
-

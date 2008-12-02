@@ -1,10 +1,11 @@
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, mapper, relation, backref, exc
+import sqlalchemy.pool as pool
 import hashlib, time, random, datetime
 
 from doubanbot import config
 
-_engine = create_engine(config.CONF.get('general', 'db'), echo=False)
+_engine = create_engine(config.DATABASE, echo=False, poolclass=pool.SingletonThreadPool, pool_recycle=120)
 _metadata = MetaData()
 
 Session = sessionmaker()
@@ -91,7 +92,7 @@ class Authen(object):
 	        s = Session()
         try:
             data = s.query(Authen).filter_by(jid=jid).one()
-            timeout_date = datetime.datetime.now() - datetime.timedelta(minutes=int(config.CONF.get('general', 'auth_timeout')))
+            timeout_date = datetime.datetime.now() - datetime.timedelta(minutes=int(config.AUTH_TIMEOUT))
             if data.last_modified and data.last_modified > timeout_date:
                 return data.hash
         except exc.NoResultFound, e:

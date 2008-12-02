@@ -12,14 +12,14 @@ from doubanbot import config
 from doubanbot import protocol
 from doubanbot import scheduling
 
-application = service.Application("DoubanBot")
+application = service.Application(config.NAME)
 
 xmppclient = XMPPClient(jid.internJID(config.SCREEN_NAME), config.CONF.get('xmpp', 'pass'))
 xmppclient.logTraffic = False
 doubanBot=protocol.DoubanBotProtocol()
 doubanBot.setHandlerParent(xmppclient)
 VERSION = commands.getoutput("git describe").strip()
-VersionHandler('DoubanBot', VERSION).setHandlerParent(xmppclient)
+VersionHandler(config.NAME, VERSION).setHandlerParent(xmppclient)
 protocol.KeepAlive().setHandlerParent(xmppclient)
 xmppclient.setServiceParent(application)
 
