@@ -75,29 +75,6 @@ class ArgRequired(BaseCommand):
     def process(self, user, prot, args, session):
         raise NotImplementedError()
 
-class WatchRequired(BaseCommand):
-
-    def __call__(self, user, prot, args, session):
-        if self.has_valid_args(args):
-            a=args.split(' ', 1)
-            newarg=None
-            if len(a) > 1: newarg=a[1]
-            try:
-                watch=session.query(models.Watch).filter_by(
-                    url=a[0]).filter_by(user_id=user.id).one()
-                self.process(user, prot, watch, newarg, session)
-            except exc.NoResultFound:
-                prot.send_plain(user.jid_full, "Cannot find watch for %s" % a[0])
-        else:
-            prot.send_plain(user.jid_full, "Arguments required for %s:\n%s"
-                % (self.name, self.extended_help))
-
-    def has_valid_args(self, args):
-        return self.is_a_url(args)
-
-    def process(self, user, prot, watch, args, session):
-        raise NotImplementedError()
-
 class ReauthCommand(BaseCommand):
 
     def __init__(self):
@@ -114,9 +91,6 @@ class ReauthCommand(BaseCommand):
             session.commit()
         except:
             print "Oops, reauth user: user.jid failed"
-
-__register(ReauthCommand)
-
 
 class StatusCommand(BaseCommand):
 
@@ -140,9 +114,6 @@ class StatusCommand(BaseCommand):
             rv.append("Online user: %s" %online_user)
         prot.send_plain(user.jid_full, "\n".join(rv))
 
-__register(StatusCommand)
-
-
 class HelpCommand(BaseCommand):
 
     def __init__(self):
@@ -161,8 +132,6 @@ class HelpCommand(BaseCommand):
             for k in sorted(all_commands.keys()):
                 rv.append('%s\t%s' % (k, all_commands[k].help))
         prot.send_plain(user.jid_full, "\n".join(rv))
-
-__register(HelpCommand)
 
 class RecommendationCommand(ArgRequired):
     def __init__(self):
@@ -195,8 +164,6 @@ class RecommendationCommand(ArgRequired):
         else:
             prot.send_plain(jid_full, "You recommendate nothing :(")
 
-__register(RecommendationCommand)
-
 class SayCommand(ArgRequired):
     def __init__(self):
         super(SayCommand, self).__init__('say', 'Say something.')
@@ -218,8 +185,6 @@ class SayCommand(ArgRequired):
             d.addCallback(callback)
         else:
             prot.send_plain(user.get_jid_full(), "You say nothing :(")
-
-__register(SayCommand)
 
 class DeleteCommand(ArgRequired):
     def __init__(self):
@@ -255,8 +220,6 @@ class DeleteCommand(ArgRequired):
         else:
             prot.send_plain(user.get_jid_full(), "You should specify the id for deletion")
 
-__register(DeleteCommand)
-
 class OnCommand(BaseCommand):
     def __init__(self):
         super(OnCommand, self).__init__('on', 'Enable notify.')
@@ -265,8 +228,6 @@ class OnCommand(BaseCommand):
         user.active=True
         prot.send_plain(user.jid_full, "Notify enabled.")
 
-__register(OnCommand)
-
 class OffCommand(BaseCommand):
     def __init__(self):
         super(OffCommand, self).__init__('off', 'Disable notify.')
@@ -274,8 +235,6 @@ class OffCommand(BaseCommand):
     def __call__(self, user, prot, args, session):
         user.active=False
         prot.send_plain(user.jid_full, "Notify disabled.")
-
-__register(OffCommand)
 
 class QuietCommand(ArgRequired):
     def __init__(self):
@@ -307,4 +266,10 @@ Example, quiet for on hour:
             prot.send_plain(user.jid_full, "I don't understand how long you want "
                 "me to be quiet.  Try: quiet 5m")
 
-__register(QuietCommand)
+for __t in (t for t in globals().values() if isinstance(type, type(t))):
+    if BaseCommand in __t.__mro__:
+        try:
+            i =  __t()
+            all_commands[i.name] = i
+        except TypeError:
+            pass
