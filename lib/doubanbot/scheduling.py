@@ -95,6 +95,8 @@ class DoubanChecker(object):
                     if hasattr(entry, 'attribute'):
                         for att in entry.attribute:
                             if att.name == 'comment' and att.text: title = "%s  \"%s\"" %(title, att.text.decode('utf-8'))
+                            if att.name == 'rating' and att.text:
+                                title = "%s %s%s" %(title, '\xe2\x98\x85'.decode('utf-8') * int(att.text), '\xe2\x98\x86'.decode('utf-8') * (5 - int(att.text)))
                     msg = "%s\n%s:  %s%s" %(msg, author, title, link)
             msg = msg.lstrip("\n")
             if not user.is_quiet() and msg != '':
