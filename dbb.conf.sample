@@ -21,3 +21,4 @@ db: mysql://doubanbot:doubanbot@localhost/doubanbot
 [xmpp]
 jid: douban@jabber.org/DoubanBot
 pass: password
+priority: 25

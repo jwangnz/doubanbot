@@ -37,7 +37,7 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
            users=session.query(models.User).count()
            if users != self._users:
                 status = "Working for %s users, Type 'help' for avaiable commands" %users
-                self.available(None, None, {None: status})
+                self.available(None, None, {None: status}, config.PRIORITY)
                 self._users = users
         finally:
             session.close()

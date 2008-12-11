@@ -11,6 +11,7 @@ CONF = ConfigParser.ConfigParser()
 CONF.read('dbb.conf')
 
 SCREEN_NAME = CONF.get('xmpp', 'jid')
+PRIORITY = CONF.getint('xmpp', 'priority')
 NAME = CONF.get('general', 'name')
 
 BATCH_CONCURRENCY = CONF.getint('general', 'batch_concurrency')
