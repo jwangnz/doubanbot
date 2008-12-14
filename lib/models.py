@@ -1,11 +1,10 @@
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, mapper, relation, backref, exc
-import sqlalchemy.pool as pool
 import hashlib, time, random, datetime
 
 from doubanbot import config
 
-_engine = create_engine(config.DATABASE, echo=False, poolclass=pool.SingletonThreadPool, pool_recycle=120)
+_engine = create_engine(config.DATABASE, echo=False)
 _metadata = MetaData()
 
 Session = sessionmaker()

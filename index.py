@@ -12,9 +12,9 @@ from doubanbot import config
 
 urls = (
  '[/]+', 'index',
- '/subscribe/([^\/]+)', 'subscribe',
- '/auth/([a-zA-Z0-9]{32})', 'auth',
- '/callback.*', 'callback',
+ '/douban/subscribe/([^\/]+)', 'subscribe',
+ '/douban/auth/([a-zA-Z0-9]{32})', 'auth',
+ '/douban/callback.*', 'callback',
 )
 
 
@@ -123,4 +123,5 @@ class subscribe:
             return "fail %s" %hash
         raise web.seeother("%s/%s" %(config.AUTH_URL, hash))
 
-application = web.application(urls, globals()).wsgifunc()
+if __name__ == '__main__':
+    application = web.application(urls, globals()).run()
