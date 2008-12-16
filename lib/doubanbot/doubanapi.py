@@ -4,17 +4,6 @@ import atom
 from twisted.internet import defer
 from twisted.web import client
 
-try:
-  from xml.etree import cElementTree as ElementTree
-except ImportError:
-  try:
-    import cElementTree as ElementTree
-  except ImportError:
-    try:
-      from xml.etree import ElementTree
-    except ImportError:
-      from elementtree import ElementTree
-
 BASE_URL = 'http://api.douban.com'
 API_KEY  = ''
 API_SECRET = ''
