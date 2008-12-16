@@ -1,128 +1,101 @@
-import sys, re
-import atom
-import gdata
 import douban
-from douban.service import DoubanService
-from douban.client import OAuthClient
+import oauth
+import atom
 from twisted.internet import defer
-from models import *
-from doubanbot import config
+from twisted.web import client
 
-class DoubanClient(object):
+try:
+  from xml.etree import cElementTree as ElementTree
+except ImportError:
+  try:
+    import cElementTree as ElementTree
+  except ImportError:
+    try:
+      from xml.etree import ElementTree
+    except ImportError:
+      from elementtree import ElementTree
 
-    def __init__(self):
-        pass
+BASE_URL = 'http://api.douban.com'
+API_KEY  = ''
+API_SECRET = ''
 
-    @staticmethod
-    def entryID(entry, prefix = ''):
-        if not isinstance(entry, gdata.GDataEntry):
-            return False
-        if hasattr(entry, 'id'):
-            id = re.search('^.*\/(\d+)$', entry.id.text)
-            if id:
-                return prefix + id.group(1)
-            else:
-                print "Error: cannot get entry numeric id by regexp, entry: %s" %entry.id.text
+class Douban(object):
+
+    def __init__(self, uid, key=None, secret=None):
+        self.uid = uid
+        self.key = key
+        self.secret = secret
+        self.consumer = oauth.OAuthConsumer(API_KEY, API_SECRET)
+        if key and secret:
+            self.token = oauth.OAuthToken(key, secret)
         else:
-            print "Error: the entry has no attribute: id"
-        return False
+            self.token = None
 
-    @staticmethod
-    def addRecommendation(uid, key, secret, title, url, comment=""):
-        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
-        if not service.ProgrammaticLogin(key, secret):
-            return False
-        ret = False
-        try:
-            print "before add reco"
-            entry = service.AddRecommendation(title, url, comment)
-            print "after add reco"
-            if type(entry) is douban.RecommendationEntry: 
-                ret = DoubanClient.entryID(entry, 'R')
-        except gdata.service.RequestError, req:
-            print "Error, addRecommendation for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
-        except:
-            print "Error, addRecommendation title: %s url: %s coment: %s" %(url, comment)
-        finally:
-            return ret
+    def __makeAuthHeader(self, method, url, parameters={}):
+        headers = {}
+        if self.token:
+            oauth_request = oauth.OAuthRequest.from_consumer_and_token(self.consumer,
+                    token=self.token, http_method=method, http_url=url, parameters=parameters)
+            oauth_request.sign_request(oauth.OAuthSignatureMethod_HMAC_SHA1(), self.consumer, self.token)
+            headers = oauth_request.to_header()
+
+        if method in ('POST','PUT'):
+            headers['Content-Type'] = 'application/atom+xml; charset=utf-8'
+        return headers
+
+    def __urlencode(self, h):
+        rv = []
+        for k,v in h.iteritems():
+            rv.append('%s=%s' %
+                (urllib.quote(k.encode("utf-8")),
+                urllib.quote(v.encode("utf-8"))))
+        return '&'.join(rv)
+
+    def __get(self, path, args=None):
+        url = BASE_URL + path
+        if args:
+            url += '?' + self.__urlencode(args)
+
+        return client.getPage(url, method='GET', headers=self.__makeAuthHeader('GET', url))
+
+    def __post(self, path, data):
+        h = {'Content-Type': 'application/atom+xml; charset=utf-8'}
+        url = BASE_URL + path
+        return client.getPage(url, method='POST',
+            postdata=data, headers=self.__makeAuthHeader('POST', url, h))
     
-    @staticmethod
-    def delRecommendation(uid, key, secret, id):
-        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
-        if not service.ProgrammaticLogin(key, secret):
-            return False
-        ret = False
-        try:
-            entry = douban.RecommendationEntry()
-            entry.id = atom.Id(text = "http://api.douban.com/recommendation/%s" %id.encode('utf-8'))
-            ret = service.DeleteRecommendation(entry)
-        except gdata.service.RequestError, req:
-            print "Error, delRecommendation for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
-        except:
-            print "Error, delRecommendation %s for user: %s failed, unexpected error" %(id, uid)
-        finally:
-            return ret
+    def __delete(self, path, args={}):
+        url = BASE_URL + path
+        return client.getPage(url, method='DELETE',
+            postdata=self.__urlencode(args), headers=self.__makeAuthHeader('DELETE', url))
 
-    @staticmethod
-    def delBroadcasting(uid, key, secret, id):
-        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
-        if not service.ProgrammaticLogin(key, secret):
-            return False
-        ret = False
+    def __parsed(self, hdef, parser):
+        deferred = defer.Deferred()
+        hdef.addErrback(lambda e: deferred.errback(e))
+        hdef.addCallback(lambda p: deferred.callback(parser(p)))
+        return deferred
+
+    def getBroadcasting(self, params=None):
+        return self.__parsed(self.__get("/people/%s/miniblog" %self.uid), douban.BroadcastingFeedFromString)
+    
+    def getContactsBroadcasting(self, params=None):
+        return self.__parsed(self.__get("/people/%s/miniblog/contacts" %self.uid), douban.BroadcastingFeedFromString)
+
+    def addBroadcasting(self, content):
         entry = douban.BroadcastingEntry()
-        entry.id = atom.Id(text = "http://api.douban.com/miniblog/%s" %id.encode('utf-8'))
-        try:
-            ret = service.DeleteBroadcasting(entry)
-        except gdata.service.RequestError, req: 
-            print "Error, delBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
-        except:
-            print "Error, delBroadcasting %s for user: %s failed, unexpected error" %(id, uid)
-        finally:
-            return ret
+        entry.content = atom.Content(text=content) 
+        return self.__parsed(self.__post("/miniblog/saying", entry.ToString()), douban.BroadcastingEntryFromString)
 
+    def delBroadcasting(self, id):
+        return self.__delete("/miniblog/%s" % str(id))
+    
+    def addRecommendation(self, title, url, comment=""):
+        entry = douban.RecommendationEntry()
+        entry.title = atom.Title(text=title)
+        entry.link = atom.Link(href=url, rel="related")
+        attribute = douban.Attribute('comment', comment)
+        entry.attribute.append(attribute)
+        return self.__parsed(self.__post("/recommendations", entry.ToString()), douban.RecommendationEntryFromString)
 
-    @staticmethod
-    def addBroadcasting(uid, key, secret, text):
-        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
-        if not service.ProgrammaticLogin(key, secret):
-            return False
-        ret = False
-        try:
-            entry = douban.BroadcastingEntry()
-            entry.content = atom.Content(text = text)
-            feed = service.AddBroadcasting("/miniblog/saying", entry)
-            if type(feed) is douban.BroadcastingEntry:
-                ret = DoubanClient.entryID(feed, 'B') 
-            else:
-                print "Error: addBroadcasting returns unexpected result, type: %s" %type(feed)
-                ret = False
-        except gdata.service.RequestError, req :
-            print "Error, addBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
-        except:
-            print "Error, addBroadcasting for user: %s failed, unexpected error" %uid
-        finally:
-            return ret
-
-    @staticmethod
-    def getContactsBroadcasting(uid, key, secret):
-        service = DoubanService(api_key=config.API_KEY, secret=config.API_SECRET)
-        if not service.ProgrammaticLogin(key, secret):
-            return False
-        uri = "/people/%s/miniblog/contacts" %uid.encode('utf-8')
-        ret = False
-        try:
-            feed = service.GetContactsBroadcastingFeed(uri)
-            ret = feed
-        except gdata.service.RequestError, req:
-            print "Error, getContactsBroadcasting for user: %s failed, RequestError, code: %s, reason: %s, body: %s" %(uid, req[0]['status'], req[0]['reason'], req[0]['body'])
-            #if req[0]['status'] == 401:
-            #    ret = None
-        except:
-            print "Error, getContactsBroadcasting for user: %s failed, unexpected error"
-        finally:
-            return ret
-
-
-
-if __name__ == '__main__':
-    pass
+    def delRecommendation(self, id):
+        return self.__delete("/recommendation/%s" % str(id))
