@@ -1,3 +1,4 @@
+from __future__ import with_statement
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, mapper, relation, backref, exc
 import hashlib, time, random, datetime
@@ -8,24 +9,31 @@ _engine = create_engine(config.DATABASE, echo=False)
 _metadata = MetaData()
 
 Session = sessionmaker()
+
+# Adding methods to Session so it can work with a with statement
+def _session_enter(self):
+    return self
+ 
+def _session_exit(self, *exc):
+    self.close()
+ 
+Session.__enter__ = _session_enter
+Session.__exit__ = _session_exit
 Session.configure(bind=_engine)
 
-def initdb(metadata, engine):
-    return metadata.create_all(engine)
+def wants_session(orig):
+    def f(*args):
+        with Session() as session:
+            return orig(*args + (session,))
+    return f
 
 class User(object):
+
+    @property
     def is_quiet(self):
         if self.quiet_until: 
             return self.quiet_until > datetime.datetime.now()
         return False
-
-    def get_jid_full(self):
-        if self.jid_full != self.jid:
-            if self.jid_full and self.status not in [ 'unsubscribed', 'unavaliable' ]:
-                return self.jid_full
-
-        return self.jid
-                
 
     @staticmethod
     def by_jid(jid, session=None):
@@ -54,8 +62,6 @@ class User(object):
             u.jid = jid
             u.auth = False
         
-        if status == 'unavailable': u.jid_full = jid
-
         u.status = status        
         try:
             s.add(u)
@@ -141,17 +147,18 @@ class Token(object):
 _users_table = Table('users', _metadata,
     Column('jid', String(128), primary_key=True, index=True, unique=True),
     Column('uid', String(128), index=True),
-    Column('jid_full', String(128)),
-    Column('name', String(255)),
-    Column('active', Boolean, default=True),
     Column('key', String(32)),
     Column('secret', String(16)),
+    Column('name', String(255)),
+    Column('active', Boolean, default=True),
     Column('auth', Boolean, default=False),
     Column('status', String(50)),
+    Column('language', String(2)),
+    Column('auto_post', Boolean, default=False),
     Column('quiet_until', DateTime),
     Column('create_date', DateTime, default=datetime.datetime.now),
     Column('last_check', DateTime),
-    Column('last_feed_dt', DateTime),
+    Column('last_cb_id', Integer),
     Column('last_modified', DateTime, onupdate=datetime.datetime.now),
 )
 
@@ -172,4 +179,3 @@ _tokens_table = Table('tokens', _metadata,
 mapper(User, _users_table)
 mapper(Authen, _authen_table)
 mapper(Token, _tokens_table)
-

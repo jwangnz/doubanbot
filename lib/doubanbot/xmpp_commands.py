@@ -1,34 +1,45 @@
 import time
 import datetime
 import re
+import chardet
 import sre_constants
+import urlparse
 
+from twisted.python import log
+from twisted.internet import defer
 from twisted.words.xish import domish
-from twisted.internet import threads
+from twisted.web import microdom, client
 from sqlalchemy.orm import exc
-from doubanapi import DoubanClient
 
 import models
 import config
+import doubanapi
+import scheduling
 
 all_commands={}
 
-def __register(cls):
-    c=cls()
-    all_commands[c.name]=c
+def arg_required(validator=lambda n: n):
+    def f(orig):
+        def every(self, user, prot, args, session):
+            if validator(args):
+                orig(self, user, prot, args, session)
+            else:
+                prot.send_plain(user.jid, "Arguments required for %s:\n%s"
+                    % (self.name, self.extended_help))
+        return every
+    return f
 
-class CountingFile(object):
-    """A file-like object that just counts what's written to it."""
-    def __init__(self):
-        self.written=0
-    def write(self, b):
-        self.written += len(b)
-    def close(self):
-        pass
-    def open(self):
-        pass
-    def read(self):
-        return None
+def oauth_required(orig):
+    def every(self, user, prot, args, session):
+        if user.auth is True:
+            orig(self, user, prot, args, session)
+        else:
+            hash = models.Authen.gen_authen_code(user.jid, session)
+            link = "%s/%s" %(config.AUTH_URL, hash)
+            message = "Please use the link below to authorise the bot for fetching your douban data:\n%s" %link
+            prot.send_plain(user.jid, "You must authorization the bot before calling %s\n%s"
+                % (self.name, message))
+    return every
 
 class BaseCommand(object):
     """Base class for command processors."""
@@ -49,31 +60,16 @@ class BaseCommand(object):
         self.help=help
         self.extended_help=extended_help
 
+    @oauth_required
     def __call__(self, user, prot, args, session):
         raise NotImplementedError()
 
     def is_a_url(self, u):
         try:
-            s=str(u)
-            # XXX:  Any good URL validators?
-            return True
+            parsed = urlparse.urlparse(str(u))
+            return parsed.scheme in ['http', 'https'] and parsed.netloc
         except:
             return False
-
-class ArgRequired(BaseCommand):
-
-    def __call__(self, user, prot, args, session):
-        if self.has_valid_args(args):
-            self.process(user, prot, args, session)
-        else:
-            prot.send_plain(user.jid_full, "Arguments required for %s:\n%s"
-                % (self.name, self.extended_help))
-
-    def has_valid_args(self, args):
-        return args
-
-    def process(self, user, prot, args, session):
-        raise NotImplementedError()
 
 class ReauthCommand(BaseCommand):
 
@@ -85,26 +81,30 @@ class ReauthCommand(BaseCommand):
         link = "%s/%s" %(config.AUTH_URL, hash)
         message = "Please use the link below to authorise the bot for fetching your douban data:\n%s" %link
         try:
-            prot.send_plain(user.jid_full, message)
+            prot.send_plain(user.jid, message)
             user.auth = False
+            user.key = None
+            user.secret = None 
             session.add(user)
             session.commit()
+            scheduling.disable_user(user.jid)
         except:
-            print "Oops, reauth user: user.jid failed"
+            print ":(, reauth user: user.jid failed"
 
 class StatusCommand(BaseCommand):
 
     def __init__(self):
         super(StatusCommand, self).__init__('status', 'Check your status.')
 
+    @oauth_required
     def __call__(self, user, prot, args, session):
         rv=[]
         rv.append("Jid:  %s" % user.jid)
         rv.append("Jabber status:  %s" % user.status)
         rv.append("Notify status:  %s"
             % {True: 'Active', False: 'Inactive'}[user.active])
-        if user.is_quiet():
-            rv.append("All alerts are quieted until %s" % str(user.quiet_until))
+        rv.append("Autopost status: %s"
+            % {True: 'Active', False: 'Inactive'}[user.auto_post])
         if user.jid in config.ADMINS:
             auth_user = session.query(models.User).filter_by(auth=True).count()
             rv.append("Authorized user: %s" %auth_user)
@@ -112,13 +112,14 @@ class StatusCommand(BaseCommand):
             rv.append("Active user: %s" %auth_active_user)
             online_user = session.query(models.User).filter_by(auth=True).filter(models.User.status != 'unavailable').filter(models.User.status != 'unsubscribed').count()
             rv.append("Online user: %s" %online_user)
-        prot.send_plain(user.jid_full, "\n".join(rv))
+        prot.send_plain(user.jid, "\n".join(rv))
 
 class HelpCommand(BaseCommand):
 
     def __init__(self):
         super(HelpCommand, self).__init__('help', 'You need help.')
 
+    @oauth_required
     def __call__(self, user, prot, args, session):
         rv=[]
         if args:
@@ -131,94 +132,141 @@ class HelpCommand(BaseCommand):
         else:
             for k in sorted(all_commands.keys()):
                 rv.append('%s\t%s' % (k, all_commands[k].help))
-        prot.send_plain(user.jid_full, "\n".join(rv))
+        prot.send_plain(user.jid, "\n".join(rv))
 
-class RecommendationCommand(ArgRequired):
+class RecommendationCommand(BaseCommand):
     def __init__(self):
         super(RecommendationCommand, self).__init__('reco', 'Recommendation something.')
-        
-    def process(self, user, prot, args, session):
+        self.extended_help="""Usage: reco title url comment
+title and comment are optional
+"""
+    
+
+    def _posted(self, entry, args, uid, jid, prot):
+        entry = doubanapi.Entry(entry)
+        prot.send_plain(jid, ":) You recommendation: '%s' has been posted, you could use command: 'delete R%s' to delete it"
+            % (args, str(entry.id)))
+
+    def _failed(self, e, args, uid, jid, prot):
+        log.msg("Error post recommendation for %s: %s" % (jid, str(e)))
+        prot.send_plain(jid, ":( Failed to post recommendation: '%s', maybe douban.com has problem now." % (args))
+
+    def _getTitleFailed(self, e, url, uid, jid, prot):
+        log.msg("Error get title of '%s': %s" % (url, str(e)))
+        prot.send_plain(jid, ":( failed get title of '%s', %s" % (url, e.getErrorMessage()))
+
+    def _encode(self, char):
+        return char.decode(chardet.detect(char)['encoding']).encode('utf-8')
+
+    def _parseHTMLTitle(self, page):
+        re.IGNORECASE = True
+        match = re.search('.*[^\<]+\<title\>([^\>^\<]+)\<\/title\>.*', str(page))
+        if match:
+            return self._encode(match.group(1))
+        else:
+            return None
+
+    def _getPageTitle(self, url, title=None):
+        if title:
+            return defer.succeed(title)
+        else:
+            deferred = defer.Deferred()
+            client.getPage(str(url), timeout=5).addCallback(
+                lambda p: deferred.callback(self._parseHTMLTitle(p))).addErrback(
+                lambda e: deferred.errback(e))
+            return deferred
+
+    def _postRecommendation(self, title, url, comment, uid, key, secret, jid, args, prot):
+        if not title:
+            return self._getTitleFailed(self, "Empty title", url, uid, jid, prot)
+        doubanapi.Douban(uid, key, secret).addRecommendation(title, url, comment).addCallback(
+            self._posted, args, uid, jid, prot).addErrback(
+            self._failed, args, uid, jid, prot)
+
+    @arg_required()
+    @oauth_required
+    def __call__(self, user, prot, args, session):
         if args:
             re.IGNORECASE = True
-            match = re.search('^(.+)\s(http|https)(\:\/\/[^\/]\S+)(.*)$', args)
-            re.IGNORECASE = False
+            match = re.search('^(.*)\s?(http|https)(\:\/\/[^\/]\S+)\s?(.*)$', args)
             if not match:
-                return prot.send_plain(user.get_jid_full(), "Error, parameter after command 'reco' should be format of: title url comment") 
+                return prot.send_plain(user.jid, "Error, parameter error. see 'help reco'")
+
             title = match.group(1)
-            url = "%s%s" %(match.group(2), match.group(3))
+            url = "%s%s" % (match.group(2), match.group(3))
             comment = match.group(4)
-            jid_full = user.get_jid_full()
             uid = user.uid
             key = user.key
+            jid = user.jid
             secret = user.secret
-            def callback(value): 
-                if value:
-                    prot.send_plain(jid_full, "OK, recommendation %s: '%s' added.\nyou could use command: 'delete %s' to delete it" %(value, args, value))
-                else:
-                    prot.send_plain(jid_full, "Oops, add recommendation: %s failed" %args)
-            def add():
-                return DoubanClient.addRecommendation(uid, key, secret, title, url, comment)
-            d = threads.deferToThread(add)
-            d.addCallback(callback)
-            return d
-        else:
-            prot.send_plain(jid_full, "You recommendate nothing :(")
+            self._getPageTitle(url, title).addCallbacks(
+                callback=lambda t: self._postRecommendation(t, url, comment, uid, key, secret, jid, args, prot),
+                errback=lambda e: self._getTitleFailed(e, url, uid, jid, prot))
+    
 
-class SayCommand(ArgRequired):
+class SayCommand(BaseCommand):
     def __init__(self):
         super(SayCommand, self).__init__('say', 'Say something.')
 
-    def process(self, user, prot, args, session):
+    def _posted(self, entry, args, jid, uid, prot):
+        id = doubanapi.Entry(entry).id
+        prot.send_plain(jid, ":) You message: '%s' has been posted, you could use command: 'delete B%s' to delete it"
+            % (args, id))
+
+    def _failed(self, e, args, jid, uid, prot):
+        log.msg("Error post messge for %s:  %s" % (jid, str(e)))
+        prot.send_plain(jid, ":( Failed to post message: '%s', maybe douban.com has problem now." % (args))
+
+    @oauth_required
+    @arg_required()
+    def __call__(self, user, prot, args, session):
         if args:
-            jid_full = user.get_jid_full()
             uid = user.uid
             key = user.key
             secret = user.secret
-            def callback(value):
-                if value:
-                    prot.send_plain(jid_full, "OK, miniblog %s: '%s' added.\nyou could use command: 'delete %s' to delete it" %(value, args, value))
-                else:
-                   prot.send_plain(jid_full, "Oops, send: %s failed" %args)
-            def add():
-                return DoubanClient.addBroadcasting(uid, key, secret, args)
-            d = threads.deferToThread(add)
-            d.addCallback(callback)
+            if key and secret and uid:
+                jid = user.jid 
+                doubanapi.Douban(uid, key, secret).addBroadcasting(args).addCallback(
+                    self._posted, args, jid, uid, prot).addErrback(self._failed, args, jid, uid, prot)
         else:
-            prot.send_plain(user.get_jid_full(), "You say nothing :(")
+            prot.send_plain(user.jid, "You say nothing :(")
 
-class DeleteCommand(ArgRequired):
+class DeleteCommand(BaseCommand):
     def __init__(self):
         super(DeleteCommand, self).__init__('delete', 'Delete broadcasting/recommendation.')
 
-    def process(self, user, prot, args, session):
+    def _posted(self, result, jid, args, prot):
+        prot.send_plain(jid, ":) item: %s has been deleted" % args)
+        
+    def _failed(self, e, jid, args, prot):
+        log.msg("Error delete item %s: %s" % (args, str(e)))
+        prot.send_plain(jid, ":( failed delete item: %s, %s" % (args, str(e)) )
+
+    @oauth_required
+    @arg_required()
+    def __call__(self, user, prot, args, session):
         if args:
             args = args.strip().upper()
             match = re.search('^([RB])(\d+)$', args)
             if not match:
-                return prot.send_plain(user.get_jid_full(), "Oops, invalid id for delete")
+                return prot.send_plain(user.jid, ":( invalid id for delete")
             type = match.group(1) 
             if type == 'R': name = 'recommendation'
             else: name = 'broadcasting'
-            id = match.group(2)
-            jid_full = user.get_jid_full()
+            id = int(match.group(2))
             uid = user.uid
             key = user.key
+            jid = user.jid
             secret = user.secret
-            def callback(value):
-                if value:
-                    prot.send_plain(jid_full, "OK, %s %s deleted" %(name, args))
-                else: 
-                    prot.send_plain(jid_full, "Oops, delete %s %s failed" %(name, args))
+            if 'recommendation' == name:
+                doubanapi.Douban(uid, key, secret).delRecommendation(id).addCallback(
+                    self._posted, jid, args, prot).addErrback(self._failed, jid, args, prot)
+            else:
+                doubanapi.Douban(uid, key, secret).delBroadcasting(id).addCallback(
+                    self._posted, jid, args, prot).addErrback(self._failed, jid, args, prot)
 
-            def delete():
-                if type == 'B':
-                    return DoubanClient.delBroadcasting(uid, key, secret, id)
-                else:
-                    return DoubanClient.delRecommendation(uid, key, secret, id)
-            d = threads.deferToThread(delete)
-            d.addCallback(callback)
         else:
-            prot.send_plain(user.get_jid_full(), "You should specify the id for deletion")
+            prot.send_plain(user.jid, ":( You should specify the id for deletion")
 
 class OnCommand(BaseCommand):
     def __init__(self):
@@ -226,7 +274,8 @@ class OnCommand(BaseCommand):
 
     def __call__(self, user, prot, args, session):
         user.active=True
-        prot.send_plain(user.jid_full, "Notify enabled.")
+        scheduling.enable_user(user.jid)
+        prot.send_plain(user.jid, "Notify enabled.")
 
 class OffCommand(BaseCommand):
     def __init__(self):
@@ -234,9 +283,25 @@ class OffCommand(BaseCommand):
 
     def __call__(self, user, prot, args, session):
         user.active=False
-        prot.send_plain(user.jid_full, "Notify disabled.")
+        scheduling.disable_user(user.jid)
+        prot.send_plain(user.jid, "Notify disabled.")
 
-class QuietCommand(ArgRequired):
+def must_be_on_or_off(args):
+    return args and args.lower() in ["on", "off"]
+ 
+class AutopostCommand(BaseCommand):
+ 
+    def __init__(self):
+        super(AutopostCommand, self).__init__('autopost',
+            "Enable or disable autopost.")
+ 
+    @oauth_required
+    @arg_required(must_be_on_or_off)
+    def __call__(self, user, prot, args, session):
+        user.auto_post = (args.lower() == "on")
+        prot.send_plain(user.jid, "Autoposting is now %s." % (args.lower()))
+
+class QuietCommand(BaseCommand):
     def __init__(self):
         super(QuietCommand, self).__init__('quiet', 'Temporarily quiet broadcastings.')
         self.extended_help="""Quiet alerts for a period of time.
@@ -247,9 +312,12 @@ Example, quiet for on hour:
   quiet 1h
 """
 
-    def process(self, user, prot, args, session):
+    @oauth_required
+    @arg_required()
+    def __call__(self, user, prot, args, session):
+        return prot.send_plain(user.jid, ":( Sorry, this command is temporarily disabled")
         if not args:
-            prot.send_plain(user.jid_full, "How long would you like me to be quiet?")
+            prot.send_plain(user.jid, "How long would you like me to be quiet?")
             return
         m = {'m': 1, 'h': 60, 'd': 1440}
         parts=args.split(' ', 1)
@@ -260,10 +328,10 @@ Example, quiet for on hour:
             u=datetime.datetime.now() + datetime.timedelta(minutes=t)
 
             user.quiet_until=u
-            prot.send_plain(user.jid_full,
+            prot.send_plain(user.jid,
                 "You won't hear from me again until %s" % str(u))
         else:
-            prot.send_plain(user.jid_full, "I don't understand how long you want "
+            prot.send_plain(user.jid, "I don't understand how long you want "
                 "me to be quiet.  Try: quiet 5m")
 
 for __t in (t for t in globals().values() if isinstance(type, type(t))):
@@ -271,5 +339,6 @@ for __t in (t for t in globals().values() if isinstance(type, type(t))):
         try:
             i =  __t()
             all_commands[i.name] = i
-        except TypeError:
+        except TypeError, e:
+            log.msg("Error loading %s: %s" % (__t.__name__, str(e)))
             pass

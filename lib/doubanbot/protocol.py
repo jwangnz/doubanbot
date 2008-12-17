@@ -1,3 +1,6 @@
+from __future__ import with_statement
+
+from twisted.python import log
 from twisted.internet import task
 from twisted.words.xish import domish
 from twisted.words.protocols.jabber.jid import JID
@@ -8,12 +11,14 @@ from wokkel.client import XMPPHandler
 import xmpp_commands
 import config
 import models
+import scheduling
+
+current_conn = None
 
 class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
 
     def __init__(self):
         super(DoubanBotProtocol, self).__init__()
-        ##self._watching=-1
         self._users=-1
 
     def connectionInitialized(self):
@@ -21,29 +26,35 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
         PresenceClientProtocol.connectionInitialized(self)
 
     def connectionMade(self):
-        print "Connected!"
+        log.msg("Connected!")
+
+        global current_conn
+        current_conn = self
 
         self.commands=xmpp_commands.all_commands
-        print "Loaded commands: ", `self.commands.keys()`
+        log.msg("Loaded commands: ", `self.commands.keys()`)
+
+        # Let the scheduler know we connected.
+        scheduling.connected()
 
         # send initial presence
-        ##self._watching=-1
         self._users=-1
         self.update_presence()
 
-    def update_presence(self):
-        session=models.Session()
-        try:
-           users=session.query(models.User).count()
-           if users != self._users:
-                status = "Working for %s users, Type 'help' for avaiable commands" %users
-                self.available(None, None, {None: status}, config.PRIORITY)
-                self._users = users
-        finally:
-            session.close()
+
+    @models.wants_session
+    def update_presence(self, session):
+        users=session.query(models.User).count()
+        if users != self._users:
+            status = "Working for %s users, Type 'help' for avaiable commands" %users
+            self.available(None, None, {None: status}, config.PRIORITY)
+            self._users = users
 
     def connectionLost(self, reason):
-        print "Disconnected!"
+        log.msg("Disconnected!")
+        global current_conn
+        current_conn = None
+        scheduling.disconnected()
 
     def typing_notification(self, jid):
         """Send a typing notification to the given jid."""
@@ -64,6 +75,16 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
 
         self.send(msg)
 
+    def send_html(self, jid, body, html):
+        msg = domish.Element((None, "message"))
+        msg["to"] = jid
+        msg["from"] = config.SCREEN_NAME
+        msg["type"] = 'chat'
+        html = u"<html xmlns='http://jabber.org/protocol/xhtml-im'><body xmlns='http://www.w3.org/1999/xhtml'>"+unicode(html)+u"</body></html>"
+        msg.addElement("body", content=unicode(body))
+        msg.addRawXml(unicode(html))
+ 
+        self.send(msg)
 
     def get_user(self, msg, session):
         jid = JID(msg['from'])
@@ -75,80 +96,84 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
             self.subscribe(jid)
         return user;
 
+    def onError(self, msg):
+        log.msg("Error received for %s: %s" % (msg['from'], msg.toXml()))
+        scheduling.unavailable_user(JID(msg['from']))
+
     def onMessage(self, msg):
-        if hasattr(msg, 'type') and msg['type'] == 'chat' and hasattr(msg, "body") and msg.body:
+        if msg["type"] == 'chat' and hasattr(msg, "body") and msg.body:
             self.typing_notification(msg['from'])
-            session = models.Session()
-            user = self.get_user(msg, session)
-            if user.status in ['unavailable', 'offline', 'dnd']:
-                user.status = 'online'
-                session.add(user)
-            if user.auth is False:
-                hash = models.Authen.gen_authen_code(user.jid)
-                link = "%s/%s" %(config.AUTH_URL, hash)
-                message = "Please use the link below to authorise the bot for fetching your douban data:\n%s" %link
-                self.send_plain(msg['from'], message)
-            else:
-                a=unicode(msg.body).split(' ', 1)
-                args = None
-                if len(a) > 1:
-                    args=a[1]
-                if self.commands.has_key(a[0].lower()):
-                    try:
-                        user.jid_full = msg['from']
-                        self.commands[a[0].lower()](self.get_user(msg, session),
-                            self, args, session)
-                        session.commit()
-                    finally:
-                        session.close()
+            a=unicode(msg.body).split(' ', 1)
+            args = a[1] if len(a) > 1 else None
+            with models.Session() as session:
+                user = self.get_user(msg, session)
+                cmd = self.commands.get(a[0].lower())
+                if cmd:
+                    cmd(user, self, args, session)
                 else:
-                    self.send_plain(msg['from'], "No such command: %s, Type 'help' for avaiable commands" %a[0])
+                    d = self.commands['say'] if user.auto_post else None
+                    if d:
+                        d(user, self, unicode(msg.body), session)
+                    else:
+                        self.send_plain(msg['from'],
+                            "No such command: %s\n"
+                            "Send 'help' for known commands\n"
+                            "If you intended to post your message, "
+                            "please start your message with 'post', or see "
+                            "'help autopost'" % a[0])
+                session.commit()
             self.update_presence()
+        else:
+            log.msg("Non-chat/body message: %s" % msg.toXml())
 
     # presence stuff
     def availableReceived(self, entity, show=None, statuses=None, priority=0):
+        log.msg("Available from %s (%s, %s, pri=%s)" % (
+            entity.full(), show, statuses, priority))
         if entity.userhost() == JID(config.SCREEN_NAME).userhost():
             return
-        print "Available from %s (%s, %s)" % (entity.full(), show, statuses)
-        models.User.update_status(entity.userhost(), show)
 
+        if priority >= 0 and show not in ['xa', 'dnd']:
+            scheduling.available_user(entity)
+        else:
+            log.msg("Marking jid unavailable due to negative priority or "
+                "being somewhat unavailable.")
+            scheduling.unavailable_user(entity)
+    
     def unavailableReceived(self, entity, statuses=None):
-        print "Unavailable from %s" % entity.userhost()
-        models.User.update_status(entity.userhost(), 'unavailable')
+        log.msg("Unavailable from %s" % entity.full())
+        scheduling.unavailable_user(entity)
 
-    def subscribedReceived(self, entity):
-        print "Subscribe received from %s" % (entity.userhost())
-        welcome_message = """Welcome to DoubanBot
+    @models.wants_session
+    def subscribedReceived(self, entity, session):
+        log.msg("Subscribe received from %s" % (entity.userhost()))
+        welcome_message = """Welcome to DoubanBot.
 
 The bot watch you douban contacts' broadcasting for you!
 
 """
-        session = models.Session()
         hash = models.Authen.gen_authen_code(entity.userhost(), session)
         auth_url = "%s/%s" %(config.AUTH_URL, hash)
         self.send_plain(entity.full(), "%s\n use the link below to authorise the bot for fetching you douban data:\n\n%s\n" %(welcome_message, auth_url))
-        try:
-            msg = "New subscriber: %s ( %d )" % (entity.userhost(),
-                session.query(models.User).count())
-            for a in config.ADMINS:
-                self.send_plain(a, msg)
-        finally:
-            session.close()
+        msg = "New subscriber: %s ( %d )" % (entity.userhost(),
+            session.query(models.User).count())
+        for a in config.ADMINS:
+            self.send_plain(a, msg)
 
     def unsubscribedReceived(self, entity):
-        print "Unsubscribed received from %s" % (entity.userhost())
+        log.msg("Unsubscribed received from %s" % (entity.userhost()))
         models.User.update_status(entity.userhost(), 'unsubscribed')
         self.unsubscribe(entity)
         self.unsubscribed(entity)
 
     def subscribeReceived(self, entity):
-        print "Subscribe received from %s" % (entity.userhost())
+        log.msg("Subscribe received from %s" % (entity.userhost()))
         self.subscribe(entity)
         self.subscribed(entity)
         self.update_presence()
 
     def unsubscribeReceived(self, entity):
-        print "Unsubscribe received from %s" % (entity.userhost())
+        log.msg("Unsubscribe received from %s" % (entity.userhost()))
         models.User.update_status(entity.userhost(), 'unsubscribed')
         self.unsubscribe(entity)
         self.unsubscribed(entity)

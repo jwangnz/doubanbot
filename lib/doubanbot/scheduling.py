@@ -1,109 +1,271 @@
 import re
 import datetime
-from mx import DateTime
+import douban
 
 import models
 import config
-from doubanapi import DoubanClient
-import douban
+import doubanapi
+import protocol
 
-from twisted.internet import defer, threads
+from twisted.python import log
+from twisted.internet import defer, threads, task
+from twisted.words.protocols.jabber.jid import JID
 
-class AuthChecker(object):
-    def __init__(self, client):
-        self.client = client
+
+private_sem = defer.DeferredSemaphore(tokens=20)
+available_sem = defer.DeferredSemaphore(tokens=2)
+
+class JidSet(set):
+ 
+    def bare_jids(self):
+        return set([JID(j).userhost() for j in self])
+
+
+class UserStuff(JidSet):
+
+    loop_time = 60
+
+    def __init__(self, short_jid, last_cb_id):
+        super(UserStuff, self).__init__()
+        self.short_jid = short_jid
+        self.last_cb_id = last_cb_id
+
+        self.uid = None
+        self.name = None
+        self.key = None
+        self.secret = None
+        self.auth = None
+        self.active = None
+
+        self.loop = None
+
+    def __deliver_message(self, entry):
+        # 
+        conn = protocol.current_conn 
+        for jid in self.bare_jids():
+            conn.send_html(jid, entry)
+
+    @models.wants_session
+    def _deferred_write(self, jid, mprop, new_val, session):
+        u = models.User.by_jid(jid, session)
+        setattr(u, mprop, new_val)
+        session.commit()
+
+    def _maybe_update_prop(self, prop, mprop):
+        old_val = getattr(self, prop)
+        def f(x):
+            new_val = getattr(self, prop)
+            if old_val != new_val:
+                threads.deferToThread(
+                    self._deferred_write, self.short_jid, mprop, new_val)
+        return f
+
 
     def __call__(self):
-        session = models.Session()
-        try:
-            users = session.query(models.User).filter_by(auth=False).all()
-            then = datetime.datetime.now() - datetime.timedelta(hours=48)
-            for user in users:
-                if user.last_check is None or user.last_check < then:
-                    if user.status == 'online':
-                        print "last_check: %s then: %s" %(str(user.last_check), str(then))
-                        print "Sending authorization request to %s" %user.jid
-                        self.__sendMessage(user.jid)
-                        user.last_check = datetime.datetime.now()
-                        session.add(user)
-                        session.commit()
-        finally:
-            session.close()
-
-    def __sendMessage(self, jid):
-        msg = "Welcom to DoubanBot.\nPlease use the link below to authorize the bot for fetching you douban data:\n"
-        hash = models.Authen.gen_authen_code(jid)
-        auth_url = "%s/%s" %(config.AUTH_URL, hash)
-        msg = "%s\n%s" %(msg, auth_url)
-        return self.client.send_plain(jid, msg)
-
-class DoubanChecker(object):
-    def __init__(self, client):
-        self.client = client
-
-    def __call__(self):
-        session = models.Session()
-        try:
-            ds = defer.DeferredSemaphore(tokens=config.BATCH_CONCURRENCY)
-            for user in models.User.to_check(session, config.WATCH_FREQ):
-                ds.run(self.__userCheck, user.jid, user.uid, user.key, user.secret)
-        finally:
-            session.close()
-
-    def __userCheck(self, jid, uid, key, secret):
-        def getFeed():
-            return DoubanClient.getContactsBroadcasting(uid, key, secret)
-        def callback(feed):
-            if type(feed) is douban.BroadcastingFeed:
-                self.onSuccess(jid, uid, key, secret, feed)
-            elif feed is None:
-                try:
-                    session = models.Session()
-                    user = models.User.by_jid(jid, session)
-                    #user.uid = jid
-                    user.name = jid
-                    user.auth = False
-                    session.add(user)
-                    session.commit()
-                    session.close()
-                    print "Authorization status of jid: %s user: %s changed to False" %(jid, uid)
-                except:
-                    print "Error: change authorization status of jid: %s user: %s to False failed " %(jid, uid)
-        d = threads.deferToThread(getFeed)
-        d.addCallback(callback)
-        return d
-
-    def onSuccess(self, jid, uid, key, secret, feed):
-        print "Success fetch broadcasting feed of user: %s" %uid
+        if self.uid and self.key and self.secret and protocol.current_conn:
+            global private_sem
+            private_sem.run(self.__get_user_stuff)
+            
+    def _gotCBResult(self, feed):
+        plains = []
+        htmls = []
         feed.entry.reverse()
-        try:
-            session = models.Session()
-            user = session.query(models.User).filter_by(jid=jid).one()
-            msg = ''
-            for entry in feed.entry:
-                dt = datetime.datetime.fromtimestamp(DateTime.ISO.ParseDateTimeUTC(entry.published.text.decode('utf-8')))
-                if not user.last_feed_dt or user.last_feed_dt < dt:
-                    user.last_feed_dt = dt
-                    # I hate python and twisted !
-                    author = entry.author[0].name.text.decode('utf-8')
-                    if author == user.name: continue
-                    if not entry.title: continue
-                    title = entry.title.text.decode('utf-8')
-                    link = re.search('href=\"([^\"]+)\"', entry.content.text.decode('utf-8'))
-                    if link and link.group(1): link = " %s" %link.group(1)
-                    else: link = ''
-                    if hasattr(entry, 'attribute'):
-                        for att in entry.attribute:
-                            if att.name == 'comment' and att.text: title = "%s  \"%s\"" %(title, att.text.decode('utf-8'))
-                            if att.name == 'rating' and att.text:
-                                title = "%s %s%s" %(title, '\xe2\x98\x85'.decode('utf-8') * int(att.text), '\xe2\x98\x86'.decode('utf-8') * (5 - int(att.text)))
-                    msg = "%s\n%s:  %s%s" %(msg, author, title, link)
-            msg = msg.lstrip("\n")
-            if not user.is_quiet() and msg != '':
-                self.client.send_plain(user.get_jid_full(), msg)
-            user.last_check = datetime.datetime.now()
-            session.add(user)
-            session.commit()
-        finally:
-            session.close()
+        for a in feed.entry:
+            entry = doubanapi.Entry(a)
+            entry_id = int(entry.id) 
+            if entry_id > self.last_cb_id:
+                self.last_cb_id = entry_id
+                if self.name == entry.authorName.decode('utf-8'):
+                    continue
+                plain = "%s: %s " % (entry.authorName.decode('utf-8'), entry.title.decode('utf-8'))
+                html = "<a href=\"%s\"><strong>%s</strong></a>: %s " % (entry.authorLink, entry.authorName.decode('utf-8'), entry.htmlContent.decode('utf-8'))
+                comment = entry.comment
+                if comment: 
+                    plain += "\"%s\"" % comment.decode('utf-8')
+                    html += "\"%s\"" % comment.decode('utf-8')
+                rating = entry.rating
+                if rating:
+                    star = "%s%s" %('\xe2\x98\x85'.decode('utf-8') * int(rating), '\xe2\x98\x86'.decode('utf-8') * (5 - int(rating)))
+                    plain += star
+                    html += star
+                link = entry.link
+                if link:
+                    plain += entry.link
+                plains.append(plain)
+                htmls.append(html)
 
+        if len(plains) > 0:
+            conn = protocol.current_conn
+            for jid in self.bare_jids():
+                conn.send_html(jid, "\n".join(plains), "<br />".join(htmls))
+            threads.deferToThread(self._deferred_write, self.short_jid, 'last_cb_id', self.last_cb_id)
+                
+
+    def __get_user_stuff(self):
+        log.msg("Getting contacts broadcasting of: %s for %s" % (self.uid, self.short_jid))
+        api = doubanapi.Douban(self.uid, self.key, self.secret)         
+        api.getContactsBroadcasting().addCallbacks(
+            callback=lambda feed: self._gotCBResult(feed),
+            errback=lambda err: self._reportError(err))
+        
+    def _reportError(self, e):
+        log.msg("Error getting user data for %s: %s" % (self.short_jid, str(e)))
+
+    def start(self):
+        log.msg("Starting %s" % self.short_jid)
+        self.loop = task.LoopingCall(self)
+        self.loop.start(self.loop_time)
+
+    def stop(self):
+        if self.loop:
+            log.msg("Stopping user %s" % self.short_jid)
+            self.loop.stop()
+            self.loop = None
+
+class RoutinChecker(object):
+    "maintain user auth status"
+
+    loop_time = 30
+
+    def __init__(self):
+        self.loop = None 
+        self.users = {}
+
+    def add(self, short_jid):
+        log.msg("Adding %s to RoutineChecker" % short_jid)
+        if not self.users.has_key(short_jid):
+            self.users[short_jid] = 1
+
+    def remove(self, short_jid):
+        log.msg("Removing %s from RoutineChecker" % short_jid)
+        if not self.users.has_key(short_jid):
+            del self.users[short_jid]
+
+    def start(self):
+        if not self.loop:
+            log.msg("Starting RoutineCheck")
+            self.loop = task.LoopingCall(self)
+            self.loop.start(self.loop_time)
+
+    def stop(self):
+        if self.loop:
+            log.msg("Stopping UserCheck")
+            self.loop.stop()
+            self.loop = None
+
+    def reset(self):
+        if not protocol.current_conn:
+            self.stop()
+        else:
+            self.start()
+
+    @models.wants_session
+    def __check_user_(self, jid, session):
+        def check(u):
+            if (u[0] and u[1] and u[2] and u[3]):
+                self.remove(jid)
+                enable_user(jid)
+        return threads.deferToThread(_load_user, jid).addCallback(check)
+
+    def __call__(self):
+        global available_sem
+        if len(self.users) and protocol.current_conn:
+            for jid in self.users.keys():
+                available_sem.run(self.__check_user_, jid)
+         
+
+class UserRegistry(object):
+
+    def __init__(self):
+        self.users = {}
+    
+    def add(self, short_jid, full_jid, last_cb_id):
+        log.msg("Adding %s as %s" % (short_jid, full_jid))
+        if not self.users.has_key(short_jid):
+            self.users[short_jid] = UserStuff(short_jid, last_cb_id)
+        self.users[short_jid].add(full_jid)
+
+    def set_creds(self, short_jid, uid, name, key, secret):
+        u = self.users.get(short_jid)
+        if not u:
+            log.msg("Couldn't find %s to set creds" % short_jid)
+            return
+
+        u.uid = uid
+        u.name = name
+        u.key = key
+        u.secret = secret
+        available = u.uid and u.key and u.secret
+
+        if not available:
+            global checker
+            checker.add(short_jid)
+
+        if available and not u.loop:
+            u.start()
+        elif u.loop and not available:
+            u.stop()
+
+    def remove(self, short_jid, full_jid=None):
+        q = self.users.get(short_jid)
+        if not q:
+            return
+        q.discard(full_jid)
+        if not q:
+            q.stop()
+            del self.users[short_jid]
+
+users = UserRegistry()
+checker = RoutinChecker()
+
+def _entity_to_jid(entity):
+    return entity if isinstance(entity, basestring) else entity.userhost()
+
+@models.wants_session
+def _load_user(entity, session):
+    u = models.User.update_status(_entity_to_jid(entity), None, session)
+    if u.active is False:
+        return ('', '', '', '', u.last_cb_id)
+    return (u.uid, u.name, u.key, u.secret, u.last_cb_id)
+
+def _init_user(u, short_jid, full_jids):
+    if u:
+        for j in full_jids:
+            users.add(short_jid, j, u[4])
+        users.set_creds(short_jid, u[0], u[1], u[2], u[3])
+
+def enable_user(jid):
+    def process():
+        return threads.deferToThread(_load_user, jid).addCallback(
+            _init_user, jid, users.users.get(jid, []))
+    global available_sem
+    available_sem.run(process)
+
+def disable_user(jid):
+    users.set_creds(jid, None, None, None, None)
+
+def available_user(entity):
+    def process():
+        return threads.deferToThread(_load_user, entity).addCallback(
+            _init_user, entity.userhost(), [entity.full()])
+    global available_sem
+    available_sem.run(process)
+
+def unavailable_user(entity):
+    users.remove(entity.userhost(), entity.full())
+
+def _reset_all():
+    global users
+    global checker
+    for u in users.users.values():
+        u.clear()
+        u.stop()
+    users = UserRegistry()
+    checker.reset()
+    
+
+def connected():
+    _reset_all()
+
+def disconnected():
+    _reset_all()
