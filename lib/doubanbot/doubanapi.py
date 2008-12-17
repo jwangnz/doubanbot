@@ -66,8 +66,9 @@ class Douban(object):
 
     def __parsed(self, hdef, parser):
         deferred = defer.Deferred()
-        hdef.addErrback(lambda e: deferred.errback(e))
-        hdef.addCallback(lambda p: deferred.callback(parser(str(p))))
+        hdef.addCallbacks(
+            callback=lambda p: deferred.callback(parser(str(p))),
+            errback=lambda e: deferred.errback(e))
         return deferred
 
     def getBroadcasting(self, params=None):
