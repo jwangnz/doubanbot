@@ -125,7 +125,7 @@ class UserStuff(JidSet):
 class RoutinChecker(object):
     "maintain user auth status"
 
-    loop_time = 30
+    loop_time = 60
 
     def __init__(self):
         self.loop = None 
@@ -138,7 +138,7 @@ class RoutinChecker(object):
 
     def remove(self, short_jid):
         log.msg("Removing %s from RoutineChecker" % short_jid)
-        if not self.users.has_key(short_jid):
+        if self.users.has_key(short_jid):
             del self.users[short_jid]
 
     def start(self):
@@ -154,10 +154,9 @@ class RoutinChecker(object):
             self.loop = None
 
     def reset(self):
-        if not protocol.current_conn:
-            self.stop()
-        else:
-            self.start()
+        self.users = {}
+        self.stop()
+        self.start()
 
     @models.wants_session
     def __check_user_(self, jid, session):
@@ -197,9 +196,11 @@ class UserRegistry(object):
         u.secret = secret
         available = u.uid and u.key and u.secret
 
+        global checker
         if not available:
-            global checker
             checker.add(short_jid)
+        else:
+            checker.remove(short_jid)
 
         if available and not u.loop:
             u.start()
@@ -224,7 +225,7 @@ def _entity_to_jid(entity):
 @models.wants_session
 def _load_user(entity, session):
     u = models.User.update_status(_entity_to_jid(entity), None, session)
-    if u.active is False:
+    if u.active is False or u.auth is False or u.is_quiet():
         return ('', '', '', '', u.last_cb_id)
     return (u.uid, u.name, u.key, u.secret, u.last_cb_id)
 

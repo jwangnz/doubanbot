@@ -105,6 +105,8 @@ class StatusCommand(BaseCommand):
             % {True: 'Active', False: 'Inactive'}[user.active])
         rv.append("Autopost status: %s"
             % {True: 'Active', False: 'Inactive'}[user.auto_post])
+        if user.is_quiet():
+            rv.append("All alerts are quieted until %s" % str(user.quiet_until))
         if user.jid in config.ADMINS:
             auth_user = session.query(models.User).filter_by(auth=True).count()
             rv.append("Authorized user: %s" %auth_user)
@@ -315,7 +317,6 @@ Example, quiet for on hour:
     @oauth_required
     @arg_required()
     def __call__(self, user, prot, args, session):
-        return prot.send_plain(user.jid, ":( Sorry, this command is temporarily disabled")
         if not args:
             prot.send_plain(user.jid, "How long would you like me to be quiet?")
             return
@@ -328,6 +329,7 @@ Example, quiet for on hour:
             u=datetime.datetime.now() + datetime.timedelta(minutes=t)
 
             user.quiet_until=u
+            scheduling.disable_user(user.jid)
             prot.send_plain(user.jid,
                 "You won't hear from me again until %s" % str(u))
         else:

@@ -29,7 +29,6 @@ def wants_session(orig):
 
 class User(object):
 
-    @property
     def is_quiet(self):
         if self.quiet_until: 
             return self.quiet_until > datetime.datetime.now()
