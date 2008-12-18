@@ -10,6 +10,8 @@ BASE_URL = 'http://api.douban.com'
 API_KEY  = ''
 API_SECRET = ''
 
+TIMEOUT = 5
+
 class Douban(object):
 
     def __init__(self, uid, key=None, secret=None):
@@ -51,17 +53,17 @@ class Douban(object):
         if args:
             url += '?' + self.__urlencode(args)
 
-        return client.getPage(url, method='GET', headers=self.__makeAuthHeader('GET', url))
+        return client.getPage(url, method='GET', timeout=TIMEOUT, headers=self.__makeAuthHeader('GET', url))
 
     def __post(self, path, data):
         h = {'Content-Type': 'application/atom+xml; charset=utf-8'}
         url = BASE_URL + path
-        return client.getPage(url, method='POST',
+        return client.getPage(url, method='POST', timeout=TIMEOUT,
             postdata=data, headers=self.__makeAuthHeader('POST', url, h))
     
     def __delete(self, path, args={}):
         url = BASE_URL + path
-        return client.getPage(url, method='DELETE',
+        return client.getPage(url, method='DELETE', timeout=TIMEOUT,
             postdata=self.__urlencode(args), headers=self.__makeAuthHeader('DELETE', url))
 
     def __parsed(self, hdef, parser):
