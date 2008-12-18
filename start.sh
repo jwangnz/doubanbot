@@ -5,6 +5,6 @@
 
 while :
 do
-        twistd -l dbb.log -ny dbb.tac --pidfile=dbb.pid
+        twistd -l log/dbb.log -ny dbb.tac --pidfile=dbb.pid -r epoll
         sleep 3
 done

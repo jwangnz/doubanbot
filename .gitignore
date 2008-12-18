@@ -3,3 +3,4 @@ dbb.conf
 *.sqlite3
 *.pyc
 dbb.pid
+log
