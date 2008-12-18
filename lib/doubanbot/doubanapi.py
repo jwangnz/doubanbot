@@ -121,7 +121,7 @@ class Entry(object):
         if hasattr(self.entry, 'id'):
             id = re.search('^.*\/(\d+)$', self.entry.id.text)
         if id:
-            return id.group(1) 
+            return int(id.group(1))
         return None
 
     @property
