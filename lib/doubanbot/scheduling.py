@@ -213,8 +213,10 @@ class UserRegistry(object):
             return
         q.discard(full_jid)
         if not q:
-            q.stop()
-            del self.users[short_jid]
+            def unavailableUser(p):
+                q.stop()
+                del self.users[short_jid]
+            threads.deferToThread(q._deferred_write, short_jid, 'status', 'unavailable').addCallback(unavailableUser)
 
 users = UserRegistry()
 checker = RoutinChecker()
