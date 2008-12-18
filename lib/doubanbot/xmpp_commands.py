@@ -55,9 +55,10 @@ class BaseCommand(object):
 
     extended_help=property(__get_extended_help, __set_extended_help)
 
-    def __init__(self, name, help=None, extended_help=None):
+    def __init__(self, name, help=None, extended_help=None, aliases=[]):
         self.name=name
         self.help=help
+        self.aliases = aliases
         self.extended_help=extended_help
 
     @oauth_required
@@ -74,7 +75,7 @@ class BaseCommand(object):
 class ReauthCommand(BaseCommand):
 
     def __init__(self):
-        super(ReauthCommand, self).__init__('reauth', 'Re Authorise.')
+        super(ReauthCommand, self).__init__('reauth', 'Re Authorize the bot.', aliases=['auth'])
 
     def __call__(self, user, prot, args, session):
         hash = models.Authen.gen_authen_code(user.jid, session)
@@ -119,7 +120,7 @@ class StatusCommand(BaseCommand):
 class HelpCommand(BaseCommand):
 
     def __init__(self):
-        super(HelpCommand, self).__init__('help', 'You need help.')
+        super(HelpCommand, self).__init__('help', 'You need help.', aliases=['?'])
 
     @oauth_required
     def __call__(self, user, prot, args, session):
@@ -129,6 +130,9 @@ class HelpCommand(BaseCommand):
             if c:
                 rv.append("Help for %s:\n" % c.name)
                 rv.append(c.extended_help)
+                if c.aliases:
+                    rv.append("\nAliases:\n * " +
+                        "\n * ".join(c.aliases))
             else:
                 rv.append("Unknown command %s." % args)
         else:
@@ -206,9 +210,9 @@ title and comment are optional
                 errback=lambda e: self._getTitleFailed(e, url, uid, jid, prot))
     
 
-class SayCommand(BaseCommand):
+class PostCommand(BaseCommand):
     def __init__(self):
-        super(SayCommand, self).__init__('say', 'Say something.')
+        super(PostCommand, self).__init__('post', 'Post a message.', aliases=['say'])
 
     def _posted(self, entry, args, jid, uid, prot):
         id = doubanapi.Entry(entry).id

@@ -31,7 +31,12 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
         global current_conn
         current_conn = self
 
-        self.commands=xmpp_commands.all_commands
+        commands=xmpp_commands.all_commands
+        self.commands={}
+        for c in commands.values():
+            self.commands[c.name] = c
+            for a in c.aliases: 
+                self.commands[a] = c
         log.msg("Loaded commands: ", `self.commands.keys()`)
 
         # Let the scheduler know we connected.
@@ -111,7 +116,7 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
                 if cmd:
                     cmd(user, self, args, session)
                 else:
-                    d = self.commands['say'] if user.auto_post else None
+                    d = self.commands['post'] if user.auto_post else None
                     if d:
                         d(user, self, unicode(msg.body), session)
                     else:
