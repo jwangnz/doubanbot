@@ -90,7 +90,7 @@ class ReauthCommand(BaseCommand):
             session.commit()
             scheduling.disable_user(user.jid)
         except:
-            print ":(, reauth user: user.jid failed"
+            log.msg(":(, reauth user: user.jid failed")
 
 class StatusCommand(BaseCommand):
 
@@ -154,11 +154,11 @@ title and comment are optional
             % (args, str(entry.id)))
 
     def _failed(self, e, args, uid, jid, prot):
-        log.msg("Error post recommendation for %s: %s" % (jid, str(e)))
+        log.msg("Error post recommendation for %s: %s" % (jid, e.getErrorMessage()))
         prot.send_plain(jid, ":( Failed to post recommendation: '%s', maybe douban.com has problem now." % (args))
 
     def _getTitleFailed(self, e, url, uid, jid, prot):
-        log.msg("Error get title of '%s': %s" % (url, str(e)))
+        log.msg("Error get title of '%s': %s" % (url, e.getErrorMessage()))
         prot.send_plain(jid, ":( failed get title of '%s', %s" % (url, e.getErrorMessage()))
 
     def _encode(self, char):
@@ -220,7 +220,7 @@ class PostCommand(BaseCommand):
             % (args, id))
 
     def _failed(self, e, args, jid, uid, prot):
-        log.msg("Error post messge for %s:  %s" % (jid, str(e)))
+        log.msg("Error post messge for %s:  %s" % (jid, e.getErrorMessage()))
         prot.send_plain(jid, ":( Failed to post message: '%s', maybe douban.com has problem now." % (args))
 
     @oauth_required
@@ -245,8 +245,8 @@ class DeleteCommand(BaseCommand):
         prot.send_plain(jid, ":) item: %s has been deleted" % args)
         
     def _failed(self, e, jid, args, prot):
-        log.msg("Error delete item %s: %s" % (args, str(e)))
-        prot.send_plain(jid, ":( failed delete item: %s, %s" % (args, str(e)) )
+        log.msg("Error delete item %s: %s" % (args, e.getErrorMessage()))
+        prot.send_plain(jid, ":( failed delete item: %s, %s" % (args, e.getErrorMessage()) )
 
     @oauth_required
     @arg_required()
