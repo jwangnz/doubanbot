@@ -96,7 +96,7 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
         try:
             user = models.User.by_jid(jid.userhost(), session)
         except:
-            print "Getting user without the jid in the DB (%s)" % jid.full()
+            log.msg("Getting user without the jid in the DB (%s)" % jid.full())
             user = models.User.update_status(jid.userhost(), None, session)
             self.subscribe(jid)
         return user;
@@ -114,10 +114,12 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
                 user = self.get_user(msg, session)
                 cmd = self.commands.get(a[0].lower())
                 if cmd:
+                    log.msg("Command %s received from %s" % (a[0], user.jid))
                     cmd(user, self, args, session)
                 else:
                     d = self.commands['post'] if user.auto_post else None
                     if d:
+                        log.msg("Command post(auto) received from %s" % user.jid)
                         d(user, self, unicode(msg.body), session)
                     else:
                         self.send_plain(msg['from'],
@@ -199,5 +201,5 @@ class KeepAlive(XMPPHandler):
             self.lc.stop()
 
     def ping(self):
-        print "Stayin' alive"
+        log.msg("Stayin' alive")
         self.send(" ")
