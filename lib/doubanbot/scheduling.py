@@ -13,7 +13,7 @@ from twisted.words.protocols.jabber.jid import JID
 
 
 private_sem = defer.DeferredSemaphore(tokens=20)
-available_sem = defer.DeferredSemaphore(tokens=2)
+available_sem = defer.DeferredSemaphore(tokens=5)
 
 class JidSet(set):
  
@@ -23,7 +23,7 @@ class JidSet(set):
 
 class UserStuff(JidSet):
 
-    loop_time = 60
+    loop_time = 30
 
     def __init__(self, short_jid, last_cb_id):
         super(UserStuff, self).__init__()
@@ -78,28 +78,29 @@ class UserStuff(JidSet):
                 if self.name == entry.authorName.decode('utf-8'):
                     continue
                 plain = "%s: %s " % (entry.authorName.decode('utf-8'), entry.title.decode('utf-8'))
-                html = "<a href=\"%s\"><strong>%s</strong></a>: %s " % (entry.authorLink, entry.authorName.decode('utf-8'), entry.htmlContent.decode('utf-8'))
+                html = "<a href=\"%s\">%s</a>: %s" % (entry.authorLink, entry.authorName.decode('utf-8'), entry.htmlContent.decode('utf-8'))
                 comment = entry.comment
                 if comment: 
-                    plain += "\"%s\"" % comment.decode('utf-8')
-                    html += "\"%s\"" % comment.decode('utf-8')
+                    plain += " \"%s\"" % comment.decode('utf-8')
+                    html += " \"%s\"" % comment.decode('utf-8')
                 rating = entry.rating
                 if rating:
-                    star = "%s%s" %('\xe2\x98\x85'.decode('utf-8') * int(rating), '\xe2\x98\x86'.decode('utf-8') * (5 - int(rating)))
+                    star = " %s%s" %('\xe2\x98\x85'.decode('utf-8') * int(rating), '\xe2\x98\x86'.decode('utf-8') * (5 - int(rating)))
                     plain += star
                     html += star
                 link = entry.link
                 if link:
                     plain += entry.link
+                html = html.replace("&lt;", "<").replace("&gt;", ">").replace('&amp;', '&')
                 plains.append(plain)
                 htmls.append(html)
 
         if len(plains) > 0:
             conn = protocol.current_conn
             for jid in self.bare_jids():
-                conn.send_html(jid, "\n".join(plains), "<br />".join(htmls))
+                #conn.send_html(jid, "\n".join(plains), "<br />".join(htmls))
+                conn.send_plain(jid, "\n".join(plains))
             threads.deferToThread(self._deferred_write, self.short_jid, 'last_cb_id', self.last_cb_id)
-                
 
     def __get_user_stuff(self):
         log.msg("Getting contacts broadcasting of: %s for %s" % (self.uid, self.short_jid))
@@ -112,9 +113,10 @@ class UserStuff(JidSet):
         log.msg("Error getting user data for %s: %s" % (self.short_jid, str(e)))
 
     def start(self):
-        log.msg("Starting %s" % self.short_jid)
-        self.loop = task.LoopingCall(self)
-        self.loop.start(self.loop_time)
+        if not self.loop:
+            log.msg("Starting %s" % self.short_jid)
+            self.loop = task.LoopingCall(self)
+            self.loop.start(self.loop_time)
 
     def stop(self):
         if self.loop:
