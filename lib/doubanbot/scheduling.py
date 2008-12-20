@@ -90,7 +90,7 @@ class UserStuff(JidSet):
                     html += star
                 link = entry.link
                 if link:
-                    plain += entry.link
+                    plain += " %s" % entry.link
                 html = html.replace("&lt;", "<").replace("&gt;", ">").replace('&amp;', '&')
                 plains.append(plain)
                 htmls.append(html)

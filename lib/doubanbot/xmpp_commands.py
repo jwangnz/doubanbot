@@ -138,7 +138,9 @@ class HelpCommand(BaseCommand):
         else:
             for k in sorted(all_commands.keys()):
                 rv.append('%s\t%s' % (k, all_commands[k].help))
+            rv.append("\nPlease post questions, suggestions or complaints at: http://www.douban.com/group/doubot/")
         prot.send_plain(user.jid, "\n".join(rv))
+
 
 class RecommendationCommand(BaseCommand):
     def __init__(self):
@@ -150,7 +152,7 @@ title and comment are optional
 
     def _posted(self, entry, args, uid, jid, prot):
         entry = doubanapi.Entry(entry)
-        prot.send_plain(jid, ":) You recommendation: '%s' has been posted, you could use command: 'delete R%s' to delete it"
+        prot.send_plain(jid, ":) Your recommendation: '%s' has been posted, you could use command: 'delete R%s' to delete it"
             % (args, str(entry.id)))
 
     def _failed(self, e, args, uid, jid, prot):
@@ -194,7 +196,7 @@ title and comment are optional
     def __call__(self, user, prot, args, session):
         if args:
             re.IGNORECASE = True
-            match = re.search('^(.*)\s?(http|https)(\:\/\/[^\/]\S+)\s?(.*)$', args)
+            match = re.search('^(\S*)\s*(http|https)(\:\/\/[^\/]\S+)\s*(.*)$', args)
             if not match:
                 return prot.send_plain(user.jid, "Error, parameter error. see 'help reco'")
 
@@ -216,7 +218,7 @@ class PostCommand(BaseCommand):
 
     def _posted(self, entry, args, jid, uid, prot):
         id = doubanapi.Entry(entry).id
-        prot.send_plain(jid, ":) You message: '%s' has been posted, you could use command: 'delete B%s' to delete it"
+        prot.send_plain(jid, ":) Your message: '%s' has been posted, you could use command: 'delete B%s' to delete it"
             % (args, id))
 
     def _failed(self, e, args, jid, uid, prot):
