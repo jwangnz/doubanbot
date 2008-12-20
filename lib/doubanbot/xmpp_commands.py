@@ -138,7 +138,7 @@ class HelpCommand(BaseCommand):
         else:
             for k in sorted(all_commands.keys()):
                 rv.append('%s\t%s' % (k, all_commands[k].help))
-            rv.append("\nPlease post questions, suggestions or complaints at: http://www.douban.com/group/doubot/")
+            rv.append("\nPlease post questions, suggestions or complaints at http://www.douban.com/group/doubot/")
         prot.send_plain(user.jid, "\n".join(rv))
 
 
