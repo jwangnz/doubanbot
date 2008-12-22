@@ -2,6 +2,7 @@ import re
 import oauth
 import atom
 import gdata
+import urllib
 import douban
 from twisted.internet import defer
 from twisted.web import client
@@ -45,7 +46,7 @@ class Douban(object):
         for k,v in h.iteritems():
             rv.append('%s=%s' %
                 (urllib.quote(k.encode("utf-8")),
-                urllib.quote(v.encode("utf-8"))))
+                urllib.quote(str(v).encode("utf-8"))))
         return '&'.join(rv)
 
     def __get(self, path, args=None):
@@ -73,11 +74,11 @@ class Douban(object):
             errback=lambda e: deferred.errback(e))
         return deferred
 
-    def getBroadcasting(self, params=None):
-        return self.__parsed(self.__get("/people/%s/miniblog" %self.uid), douban.BroadcastingFeedFromString)
+    def getBroadcasting(self, args=None):
+        return self.__parsed(self.__get("/people/%s/miniblog" %self.uid, args), douban.BroadcastingFeedFromString)
     
-    def getContactsBroadcasting(self, params=None):
-        return self.__parsed(self.__get("/people/%s/miniblog/contacts" % str(self.uid)), douban.BroadcastingFeedFromString)
+    def getContactsBroadcasting(self, args=None):
+        return self.__parsed(self.__get("/people/%s/miniblog/contacts" % str(self.uid), args), douban.BroadcastingFeedFromString)
 
     def addBroadcasting(self, content):
         entry = douban.BroadcastingEntry()
