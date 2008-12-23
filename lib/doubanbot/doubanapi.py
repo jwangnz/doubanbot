@@ -15,6 +15,8 @@ TIMEOUT = 5
 
 class Douban(object):
 
+    agent = "twisted-douban - yet another knock-off douban client"
+
     def __init__(self, uid, key=None, secret=None):
         self.uid = uid
         self.key = key
@@ -54,17 +56,17 @@ class Douban(object):
         if args:
             url += '?' + self.__urlencode(args)
 
-        return client.getPage(url, method='GET', timeout=TIMEOUT, headers=self.__makeAuthHeader('GET', url))
+        return client.getPage(url, method='GET', timeout=TIMEOUT, agent=self.agent, headers=self.__makeAuthHeader('GET', url))
 
     def __post(self, path, data):
         h = {'Content-Type': 'application/atom+xml; charset=utf-8'}
         url = BASE_URL + path
-        return client.getPage(url, method='POST', timeout=TIMEOUT,
+        return client.getPage(url, method='POST', timeout=TIMEOUT, agent=self.agent,
             postdata=data, headers=self.__makeAuthHeader('POST', url, h))
     
     def __delete(self, path, args={}):
         url = BASE_URL + path
-        return client.getPage(url, method='DELETE', timeout=TIMEOUT,
+        return client.getPage(url, method='DELETE', timeout=TIMEOUT, agent=self.agent,
             postdata=self.__urlencode(args), headers=self.__makeAuthHeader('DELETE', url))
 
     def __parsed(self, hdef, parser):
