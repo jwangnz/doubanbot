@@ -22,3 +22,4 @@ db: mysql://doubanbot:doubanbot@localhost/doubanbot
 jid: douban@jabber.org/DoubanBot
 pass: password
 priority: 25
+avatar: 320ab8a18220d43989f47b30b447d47165c7456a
