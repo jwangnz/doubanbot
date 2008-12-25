@@ -13,6 +13,9 @@ CONF.read('dbb.conf')
 SCREEN_NAME = CONF.get('xmpp', 'jid')
 PRIORITY = CONF.getint('xmpp', 'priority')
 NAME = CONF.get('general', 'name')
+AVATAR = None
+if CONF.has_option('xmpp', 'avatar'):
+   AVATAR = CONF.get('xmpp', 'avatar') 
 
 BATCH_CONCURRENCY = CONF.getint('general', 'batch_concurrency')
 WATCH_FREQ = CONF.getint('general', 'watch_freq')
