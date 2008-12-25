@@ -77,7 +77,6 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
     def send_avatar(self, hash):
         presence = domish.Element((None, "presence"))
         presence['from'] = config.SCREEN_NAME
-        presence['to'] = 'tsing@jabber.org/Miranda'
         presence.addElement(('vcard-temp:x:update', 'x')).addElement("photo", content=hash)
         self.send(presence)
 
