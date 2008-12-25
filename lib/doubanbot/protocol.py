@@ -46,6 +46,9 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
         self._users=-1
         self.update_presence()
 
+        if config.CONF.has_option('xmpp', 'avatar'):
+            self.send_avatar(config.CONF.get('xmpp', 'avatar'))
+
 
     @models.wants_session
     def update_presence(self, session):
@@ -70,6 +73,13 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
         msg.addElement(('jabber:x:event', 'x')).addElement("composing")
 
         self.send(msg)
+
+    def send_avatar(self, hash):
+        presence = domish.Element((None, "presence"))
+        presence['from'] = config.SCREEN_NAME
+        presence['to'] = 'tsing@jabber.org/Miranda'
+        presence.addElement(('vcard-temp:x:update', 'x')).addElement("photo", content=hash)
+        self.send(presence)
 
     def send_plain(self, jid, content):
         msg = domish.Element((None, "message"))
