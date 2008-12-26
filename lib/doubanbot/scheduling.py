@@ -25,10 +25,11 @@ class UserStuff(JidSet):
 
     loop_time = 30
 
-    def __init__(self, short_jid, last_cb_id):
+    def __init__(self, short_jid, last_cb_id, last_dm_id):
         super(UserStuff, self).__init__()
         self.short_jid = short_jid
         self.last_cb_id = last_cb_id
+        self.last_dm_id = last_dm_id
 
         self.uid = None
         self.name = None
@@ -65,6 +66,33 @@ class UserStuff(JidSet):
         if self.uid and self.key and self.secret and protocol.current_conn:
             global private_sem
             private_sem.run(self.__get_user_stuff)
+
+    def _gotDMResult(self, feed):
+        plains = []
+        feed.entry.reverse()
+        hasNew = False
+        for a in feed.entry: 
+            entry = doubanapi.Entry(a)
+            entry_id = int(entry.id)
+            if entry_id > self.last_dm_id:
+                self.last_dm_id = entry_id
+                hasNew = True
+                if entry.isRead is True:
+                    continue
+
+                plain = "[New Mail]\nFrom: %s\nDate: %s\nTitle: %s\nView: %s\n" % (
+                    entry.authorName.decode('utf-8'), entry.published,
+                    entry.title.decode('utf-8'), entry.alternateLink)
+                plains.append(plain)
+
+        if len(plains) > 0: 
+            conn = protocol.current_conn
+            for jid in self.bare_jids():
+                conn.send_plain(jid, "\n".join(plains))
+
+        if hasNew:
+           threads.deferToThread(self._deferred_write, self.short_jid, 'last_dm_id', self.last_dm_id) 
+
             
     def _gotCBResult(self, feed):
         plains = []
@@ -108,7 +136,10 @@ class UserStuff(JidSet):
         api.getContactsBroadcasting().addCallbacks(
             callback=lambda feed: self._gotCBResult(feed),
             errback=lambda err: self._reportError(err))
-        
+        api.getDoumailFeed('/doumail/inbox').addCallbacks(
+            callback=lambda feed: self._gotDMResult(feed),
+            errback=lambda feed: self.reportError(err))         
+
     def _reportError(self, e):
         log.msg("Error getting user data for %s: %s" % (self.short_jid, str(e)))
 
@@ -180,10 +211,10 @@ class UserRegistry(object):
     def __init__(self):
         self.users = {}
     
-    def add(self, short_jid, full_jid, last_cb_id):
+    def add(self, short_jid, full_jid, last_cb_id, last_dm_id):
         log.msg("Adding %s as %s" % (short_jid, full_jid))
         if not self.users.has_key(short_jid):
-            self.users[short_jid] = UserStuff(short_jid, last_cb_id)
+            self.users[short_jid] = UserStuff(short_jid, last_cb_id, last_dm_id)
         self.users[short_jid].add(full_jid)
 
     def set_creds(self, short_jid, uid, name, key, secret):
@@ -230,13 +261,13 @@ def _entity_to_jid(entity):
 def _load_user(entity, session):
     u = models.User.update_status(_entity_to_jid(entity), None, session)
     if u.active is False or u.auth is False or u.is_quiet():
-        return ('', '', '', '', u.last_cb_id)
-    return (u.uid, u.name, u.key, u.secret, u.last_cb_id)
+        return ('', '', '', '', u.last_cb_id, u.last_dm_id)
+    return (u.uid, u.name, u.key, u.secret, u.last_cb_id, u.last_dm_id)
 
 def _init_user(u, short_jid, full_jids):
     if u:
         for j in full_jids:
-            users.add(short_jid, j, u[4])
+            users.add(short_jid, j, u[4], u[5])
         users.set_creds(short_jid, u[0], u[1], u[2], u[3])
 
 def enable_user(jid):

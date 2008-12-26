@@ -101,6 +101,11 @@ class Douban(object):
     def delRecommendation(self, id):
         return self.__delete("/recommendation/%s" % str(id))
 
+    def getDoumailFeed(self, path):
+        return self.__parsed(self.__get(path), douban.DoumailFeedFromString)
+
+    def getDoumail(self, id):
+        return self.__parsed(self.__get("/doumail/%s", str(id)), douban.DoumailEntryFromString)
 
 def _entry_check(orig):
     def every(self):
@@ -150,10 +155,29 @@ class Entry(object):
 
     @property
     @_entry_check
+    def published(self):
+        return self.entry.published.text.replace('T', ' ')[0:19]
+
+    @property
+    @_entry_check
     def link(self):
         link = re.search('href=\"([^\"]+)\"', self.entry.content.text)
         if link and link.group(1):
             return link.group(1)
+        return None
+
+    @property
+    @_entry_check
+    def alternateLink(self):
+        return self.entry.GetAlternateLink().href
+
+    @property
+    @_entry_check
+    def isRead(self):
+        if hasattr(self.entry, 'attribute'):
+            for att in self.entry.attribute:
+                if att.name == 'unread' and att.text:
+                    return "false" == att.text
         return None
 
     @property

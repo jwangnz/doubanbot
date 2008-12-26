@@ -158,6 +158,7 @@ _users_table = Table('users', _metadata,
     Column('create_date', DateTime, default=datetime.datetime.now),
     Column('last_check', DateTime),
     Column('last_cb_id', Integer),
+    Column('last_dm_id', Integer),
     Column('last_modified', DateTime, onupdate=datetime.datetime.now),
 )
 
