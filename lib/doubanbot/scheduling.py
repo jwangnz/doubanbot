@@ -86,6 +86,7 @@ class UserStuff(JidSet):
                 plains.append(plain)
 
         if len(plains) > 0: 
+            log.msg("User: %s got %s new doumail" % (self.uid, len(plains)))
             conn = protocol.current_conn
             for jid in self.bare_jids():
                 conn.send_plain(jid, "\n".join(plains))
