@@ -80,8 +80,8 @@ class UserStuff(JidSet):
                 if entry.isRead is True:
                     continue
 
-                plain = "[New Mail]\nFrom: %s\nDate: %s\nTitle: %s\nView: %s\n" % (
-                    entry.authorName.decode('utf-8'), entry.published,
+                plain = "Got a doumail from %s: %s\n%s" % (
+                    entry.authorName.decode('utf-8'), 
                     entry.title.decode('utf-8'), entry.alternateLink)
                 plains.append(plain)
 
