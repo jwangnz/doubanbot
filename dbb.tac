@@ -25,8 +25,12 @@ application = service.Application(config.NAME)
 
 xmppclient = XMPPClient(jid.internJID(config.SCREEN_NAME), config.CONF.get('xmpp', 'pass'))
 xmppclient.logTraffic = False
-doubanBot=protocol.DoubanBotProtocol()
-doubanBot.setHandlerParent(xmppclient)
+
+protocols = [protocol.DoubanbotPresenceProtocol, protocol.DoubanbotMessageProtocol]
+for p in protocols:
+    handler = p()
+    handler.setHandlerParent(xmppclient)
+
 VersionHandler(config.NAME, VERSION).setHandlerParent(xmppclient)
 KeepAlive().setHandlerParent(xmppclient)
 xmppclient.setServiceParent(application)

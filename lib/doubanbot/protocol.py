@@ -15,15 +15,7 @@ import scheduling
 
 current_conn = None
 
-class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
-
-    def __init__(self):
-        super(DoubanBotProtocol, self).__init__()
-        self._users=-1
-
-    def connectionInitialized(self):
-        MessageProtocol.connectionInitialized(self)
-        PresenceClientProtocol.connectionInitialized(self)
+class DoubanbotMessageProtocol(MessageProtocol):
 
     def connectionMade(self):
         log.msg("Connected!")
@@ -41,18 +33,6 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
 
         # Let the scheduler know we connected.
         scheduling.connected()
-
-        # send initial presence
-        self._users=-1
-        self.update_presence()
-
-    @models.wants_session
-    def update_presence(self, session):
-        users=session.query(models.User).count()
-        if users != self._users:
-            status = "Working for %s users, Type 'help' for available commands" %users
-            self.available(None, None, {None: status}, config.PRIORITY)
-            self._users = users
 
     def connectionLost(self, reason):
         log.msg("Disconnected!")
@@ -132,16 +112,34 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
                             "please start your message with 'post', or see "
                             "'help autopost'" % a[0])
                 session.commit()
-            self.update_presence()
         else:
             log.msg("Non-chat/body message: %s" % msg.toXml())
 
-    # presence stuff
+
+class DoubanbotPresenceProtocol(PresenceClientProtocol):
+
+    _users = -1
+
+    def connectionMade(self):
+        # send initial presence
+        self._users=-1
+        self.update_presence()
+
+    @models.wants_session
+    def update_presence(self, session):
+        users=session.query(models.User).count()
+        if users != self._users:
+            status = "Working for %s users, Type 'help' for available commands" %users
+            self.available(None, None, {None: status}, config.PRIORITY)
+            self._users = users
+
+    # available with avatar stuff
     def available(self, entity=None, show=None, statuses=None, priority=0):
         presence = AvailablePresence(entity, show, statuses, priority)
         presence.addElement(('vcard-temp:x:update', 'x')).addElement("photo", content=config.AVATAR) 
         self.send(presence)
 
+    # presence stuff
     def availableReceived(self, entity, show=None, statuses=None, priority=0):
         log.msg("Available from %s (%s, %s, pri=%s)" % (
             entity.full(), show, statuses, priority))
