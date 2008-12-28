@@ -116,7 +116,11 @@ class DoubanBotProtocol(MessageProtocol, PresenceClientProtocol):
                     log.msg("Command %s received from %s" % (a[0], user.jid))
                     cmd(user, self, args, session)
                 else:
-                    d = self.commands['post'] if user.auto_post else None
+                    d = None
+                    if user.auto_post:
+                        d=self.commands['post']
+                    elif a[0][0] == '@':
+                        d=self.commands['post']
                     if d:
                         log.msg("Command post(auto) received from %s" % user.jid)
                         d(user, self, unicode(msg.body), session)
