@@ -144,7 +144,7 @@ class HelpCommand(BaseCommand):
 
 class RecommendationCommand(BaseCommand):
     def __init__(self):
-        super(RecommendationCommand, self).__init__('reco', 'Recommendation something.')
+        super(RecommendationCommand, self).__init__('reco', 'Recommend a url')
         self.extended_help="""Usage: reco title url comment
 title and comment are optional
 """
