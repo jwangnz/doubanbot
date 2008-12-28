@@ -50,7 +50,10 @@ class UserStuff(JidSet):
     def _deferred_write(self, jid, mprop, new_val, session):
         u = models.User.by_jid(jid, session)
         setattr(u, mprop, new_val)
-        session.commit()
+        try:
+            session.commit()
+        except:
+            log.err()
 
     def _maybe_update_prop(self, prop, mprop):
         old_val = getattr(self, prop)
