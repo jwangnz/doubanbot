@@ -1,5 +1,6 @@
 import sys
-sys.path.append("lib")
+sys.path.insert(0,"lib/wokkel")
+sys.path.insert(0,"lib")
 
 import commands
 from twisted.application import service
@@ -7,6 +8,7 @@ from twisted.internet import task, reactor
 from twisted.words.protocols.jabber import jid
 from wokkel.client import XMPPClient
 from wokkel.generic import VersionHandler
+from wokkel.keepalive import KeepAlive
 
 from doubanbot import config
 from doubanbot import protocol
@@ -26,6 +28,6 @@ xmppclient.logTraffic = False
 doubanBot=protocol.DoubanBotProtocol()
 doubanBot.setHandlerParent(xmppclient)
 VersionHandler(config.NAME, VERSION).setHandlerParent(xmppclient)
-protocol.KeepAlive().setHandlerParent(xmppclient)
+KeepAlive().setHandlerParent(xmppclient)
 xmppclient.setServiceParent(application)
 
