@@ -120,9 +120,9 @@ class UserStuff(JidSet):
                     star = " %s%s" %('\xe2\x98\x85'.decode('utf-8') * int(rating), '\xe2\x98\x86'.decode('utf-8') * (5 - int(rating)))
                     plain += star
                     html += star
-                link = entry.link
+                link = entry.contentLink
                 if link:
-                    plain += " %s" % entry.link
+                    plain += " %s" % link
                 html = html.replace("&lt;", "<").replace("&gt;", ">").replace('&amp;', '&')
                 plains.append(plain)
                 htmls.append(html)
@@ -145,7 +145,7 @@ class UserStuff(JidSet):
             errback=lambda feed: self._reportError(err))         
 
     def _reportError(self, e):
-        log.msg("Error getting user data for %s: %s" % (self.short_jid, str(e)))
+        log.msg("Error getting user data for %s: %s" % (self.short_jid, e.getErrorMessage()))
 
     def start(self):
         if not self.loop:

@@ -160,7 +160,7 @@ class Entry(object):
 
     @property
     @_entry_check
-    def link(self):
+    def contentLink(self):
         link = re.search('href=\"([^\"]+)\"', self.entry.content.text)
         if link and link.group(1):
             return link.group(1)
