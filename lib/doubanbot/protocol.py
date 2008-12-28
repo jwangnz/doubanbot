@@ -161,17 +161,16 @@ class DoubanbotPresenceProtocol(PresenceClientProtocol):
     def subscribedReceived(self, entity, session):
         log.msg("Subscribe received from %s" % (entity.userhost()))
         welcome_message = """Welcome to DoubanBot.
-
-The bot watch you douban contacts' broadcasting for you!
-
+Here you can use your normal IM client to post messages or recommend urls to douban, track contacts broadcasting, doumail notify from douban, and more.
 """
         hash = models.Authen.gen_authen_code(entity.userhost(), session)
         auth_url = "%s/%s" %(config.AUTH_URL, hash)
-        self.send_plain(entity.full(), "%s\n use the link below to authorise the bot for fetching you douban data:\n\n%s\n" %(welcome_message, auth_url))
+        global current_conn
+        current_conn.send_plain(entity.full(), "%s\nPlease use the link below to authorize the bot for fetching you douban data:\n\n%s\n" %(welcome_message, auth_url))
         msg = "New subscriber: %s ( %d )" % (entity.userhost(),
             session.query(models.User).count())
         for a in config.ADMINS:
-            self.send_plain(a, msg)
+            current_conn.send_plain(a, msg)
 
     def unsubscribedReceived(self, entity):
         log.msg("Unsubscribed received from %s" % (entity.userhost()))
