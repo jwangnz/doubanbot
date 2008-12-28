@@ -101,11 +101,11 @@ class Douban(object):
     def delRecommendation(self, id):
         return self.__delete("/recommendation/%s" % str(id))
 
-    def getDoumailFeed(self, path):
-        return self.__parsed(self.__get(path), douban.DoumailFeedFromString)
+    def getDoumailFeed(self, path, args=None):
+        return self.__parsed(self.__get(path, args), douban.DoumailFeedFromString)
 
-    def getDoumail(self, id):
-        return self.__parsed(self.__get("/doumail/%s", str(id)), douban.DoumailEntryFromString)
+    def getDoumail(self, id, args=None):
+        return self.__parsed(self.__get("/doumail/%s" % str(id), args), douban.DoumailEntryFromString)
 
 def _entry_check(orig):
     def every(self):
