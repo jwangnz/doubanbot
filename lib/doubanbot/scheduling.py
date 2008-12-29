@@ -142,7 +142,7 @@ class UserStuff(JidSet):
             errback=lambda err: self._reportError(err))
         api.getDoumailFeed('/doumail/inbox').addCallbacks(
             callback=lambda feed: self._gotDMResult(feed),
-            errback=lambda feed: self._reportError(err))         
+            errback=lambda err: self._reportError(err))         
 
     def _reportError(self, e):
         log.msg("Error getting user data for %s: %s" % (self.short_jid, e.getErrorMessage()))
