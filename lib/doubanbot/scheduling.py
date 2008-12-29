@@ -250,10 +250,8 @@ class UserRegistry(object):
             return
         q.discard(full_jid)
         if not q:
-            def unavailableUser(p):
-                q.stop()
-                del self.users[short_jid]
-            threads.deferToThread(q._deferred_write, short_jid, 'status', 'unavailable').addCallback(unavailableUser)
+            q.stop()
+            del self.users[short_jid]
 
 users = UserRegistry()
 checker = RoutinChecker()
@@ -263,7 +261,12 @@ def _entity_to_jid(entity):
 
 @models.wants_session
 def _load_user(entity, session):
-    u = models.User.update_status(_entity_to_jid(entity), None, session)
+    jid = _entity_to_jid(entity)
+    try:
+        u = models.User.by_jid(jid, session)
+    except:
+        log.msg("Getting user without the jid in the DB (%s)" % jid)
+        u = models.User.update_status(jid, None, session)
     if u.active is False or u.auth is False or u.is_quiet():
         return ('', '', '', '', u.last_cb_id, u.last_dm_id)
     return (u.uid, u.name, u.key, u.secret, u.last_cb_id, u.last_dm_id)
@@ -298,6 +301,9 @@ def resources(jid):
     """Find all watched resources for the given JID."""
     jids=users.users.get(jid, [])
     return [JID(j).resource for j in jids]
+
+def online_users_count():
+    return len(users.users) 
 
 def _reset_all():
     global users
