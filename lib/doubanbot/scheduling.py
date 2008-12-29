@@ -294,6 +294,11 @@ def available_user(entity):
 def unavailable_user(entity):
     users.remove(entity.userhost(), entity.full())
 
+def resources(jid):
+    """Find all watched resources for the given JID."""
+    jids=users.users.get(jid, [])
+    return [JID(j).resource for j in jids]
+
 def _reset_all():
     global users
     global checker

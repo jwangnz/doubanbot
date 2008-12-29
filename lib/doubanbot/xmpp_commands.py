@@ -106,6 +106,14 @@ class StatusCommand(BaseCommand):
             % {True: 'Active', False: 'Inactive'}[user.active])
         rv.append("Autopost status: %s"
             % {True: 'Active', False: 'Inactive'}[user.auto_post])
+        resources = scheduling.resources(user.jid)
+        if resources:
+            rv.append("I see you logged in with the following resources:")
+            for r in resources:
+                rv.append(" %s %s" % ('\xe2\x80\xa2'.decode('utf-8'), r))
+        else:
+            rv.append("I don't see you logged in with any resource I'd send "
+                "a message to.  Perhaps you're dnd, xa, or negative priority.")
         if user.is_quiet():
             rv.append("All alerts are quieted until %s" % str(user.quiet_until))
         if user.jid in config.ADMINS:
