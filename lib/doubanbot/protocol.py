@@ -137,6 +137,7 @@ class DoubanbotPresenceProtocol(PresenceClientProtocol):
     def update_presence(self, session):
         try:
             users=session.query(models.User).count()
+            print "USERS: %s" %users
             if users != self._users:
                 status = "Working for %s users, Type 'help' for available commands" %users
                 self.available(None, None, {None: status}, config.PRIORITY)
@@ -170,7 +171,7 @@ class DoubanbotPresenceProtocol(PresenceClientProtocol):
 
     @models.wants_session
     def subscribedReceived(self, entity, session):
-        log.msg("Subscribe received from %s" % (entity.userhost()))
+        log.msg("Subscribed received from %s" % (entity.userhost()))
         welcome_message = """Welcome to DoubanBot.
 Here you can use your normal IM client to post messages or recommend urls to douban, track contacts broadcasting, doumail notify from douban, and more.
 """
