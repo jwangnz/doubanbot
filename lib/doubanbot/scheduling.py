@@ -1,4 +1,5 @@
 import re
+import time
 import datetime
 import douban
 
@@ -8,7 +9,7 @@ import doubanapi
 import protocol
 
 from twisted.python import log
-from twisted.internet import defer, threads, task
+from twisted.internet import defer, reactor, threads, task
 from twisted.words.protocols.jabber.jid import JID
 
 
@@ -37,6 +38,7 @@ class UserStuff(JidSet):
         self.secret = None
         self.auth = None
         self.active = None
+        self.quiet_until = None
 
         self.loop = None
 
@@ -198,7 +200,7 @@ class RoutinChecker(object):
     @models.wants_session
     def __check_user_(self, jid, session):
         def check(u):
-            if (u[0] and u[1] and u[2] and u[3]):
+            if (u[1][0] and u[1][1] and u[1][2] and u[1][3]):
                 self.remove(jid)
                 enable_user(jid)
         return threads.deferToThread(_load_user, jid).addCallback(check)
@@ -221,7 +223,7 @@ class UserRegistry(object):
             self.users[short_jid] = UserStuff(short_jid, last_cb_id, last_dm_id)
         self.users[short_jid].add(full_jid)
 
-    def set_creds(self, short_jid, uid, name, key, secret):
+    def set_creds(self, short_jid, uid, name, key, secret, quiet_until):
         u = self.users.get(short_jid)
         if not u:
             log.msg("Couldn't find %s to set creds" % short_jid)
@@ -231,6 +233,7 @@ class UserRegistry(object):
         u.name = name
         u.key = key
         u.secret = secret
+        u.quiet_until = u.quiet_until
         available = u.uid and u.key and u.secret
 
         global checker
@@ -239,7 +242,15 @@ class UserRegistry(object):
         else:
             checker.remove(short_jid)
 
-        if available and not u.loop:
+        if u.quiet_until is None:
+            quiet_seconds = 0
+        else:
+            quiet_seconds = time.time() - time.mktime((datetime.datetime.now() - u.quiet_until).timetuple())
+
+        if available and quiet_seconds > 0:
+            u.stop()
+            reactor.callLater(quiet_seconds, u.start) 
+        elif available and not u.loop:
             u.start()
         elif u.loop and not available:
             u.stop()
@@ -267,15 +278,15 @@ def _load_user(entity, session):
     except:
         log.msg("Getting user without the jid in the DB (%s)" % jid)
         u = models.User.update_status(jid, None, session)
-    if u.active is False or u.auth is False or u.is_quiet():
-        return ('', '', '', '', u.last_cb_id, u.last_dm_id)
-    return (u.uid, u.name, u.key, u.secret, u.last_cb_id, u.last_dm_id)
+    if u.active is False or u.auth is False:
+        return ((u.last_cb_id, u.last_dm_id), ('', '', '', '', u.quiet_until))
+    return ((u.last_cb_id, u.last_dm_id), (u.uid, u.name, u.key, u.secret, u.quiet_until))
 
 def _init_user(u, short_jid, full_jids):
     if u:
         for j in full_jids:
-            users.add(short_jid, j, u[4], u[5])
-        users.set_creds(short_jid, u[0], u[1], u[2], u[3])
+            users.add(short_jid, j, u[0][0], u[0][1])
+        users.set_creds(short_jid, u[1][0], u[1][1], u[1][2], u[1][3], u[1][4])
 
 def enable_user(jid):
     def process():
@@ -285,7 +296,7 @@ def enable_user(jid):
     available_sem.run(process)
 
 def disable_user(jid):
-    users.set_creds(jid, None, None, None, None)
+    users.set_creds(jid, None, None, None, None, None)
 
 def available_user(entity):
     def process():
