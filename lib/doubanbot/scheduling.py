@@ -233,7 +233,7 @@ class UserRegistry(object):
         u.name = name
         u.key = key
         u.secret = secret
-        u.quiet_until = u.quiet_until
+        u.quiet_until = quiet_until
         available = u.uid and u.key and u.secret
 
         global checker
@@ -242,10 +242,11 @@ class UserRegistry(object):
         else:
             checker.remove(short_jid)
 
-        if u.quiet_until is None:
+        if not isinstance(u.quiet_until, datetime.datetime):
             quiet_seconds = 0
         else:
-            quiet_seconds = time.time() - time.mktime((datetime.datetime.now() - u.quiet_until).timetuple())
+            quiet_seconds = time.mktime(u.quiet_until.timetuple()) - time.time()
+            print "%s quiet_seconds: %s" % (short_jid, quiet_seconds)
 
         if available and quiet_seconds > 0:
             u.stop()
