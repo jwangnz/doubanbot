@@ -133,6 +133,7 @@ class UserStuff(JidSet):
             conn = protocol.current_conn
             for jid in self.bare_jids():
                 #conn.send_html(jid, "\n".join(plains), "<br />".join(htmls))
+                log.msg("Sending message to %s" % jid)
                 conn.send_plain(jid, "\n".join(plains))
             threads.deferToThread(self._deferred_write, self.short_jid, 'last_cb_id', self.last_cb_id)
 
