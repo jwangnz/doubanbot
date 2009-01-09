@@ -247,7 +247,6 @@ class UserRegistry(object):
             quiet_seconds = 0
         else:
             quiet_seconds = time.mktime(u.quiet_until.timetuple()) - time.time()
-            print "%s quiet_seconds: %s" % (short_jid, quiet_seconds)
 
         if available and quiet_seconds > 0:
             u.stop()
