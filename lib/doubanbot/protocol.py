@@ -14,6 +14,7 @@ import models
 import scheduling
 
 current_conn = None
+presence_conn = None
 
 class DoubanbotMessageProtocol(MessageProtocol):
 
@@ -132,6 +133,9 @@ class DoubanbotPresenceProtocol(PresenceClientProtocol):
         # send initial presence
         self._users=-1
         self.update_presence()
+
+        global presence_conn
+        presence_conn = self
 
     @models.wants_session
     def update_presence(self, session):
