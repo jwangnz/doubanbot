@@ -141,7 +141,6 @@ class DoubanbotPresenceProtocol(PresenceClientProtocol):
     def update_presence(self, session):
         try:
             users=session.query(models.User).count()
-            print "USERS: %s" %users
             if users != self._users:
                 status = "Working for %s users, Type 'help' for available commands" %users
                 self.available(None, None, {None: status}, config.PRIORITY)
