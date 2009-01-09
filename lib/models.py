@@ -34,6 +34,10 @@ class User(object):
             return self.quiet_until > datetime.datetime.now()
         return False
 
+    @property
+    def is_admin(self):
+        return self.jid in config.ADMINS
+
     @staticmethod
     def by_jid(jid, session=None):
         s=session
