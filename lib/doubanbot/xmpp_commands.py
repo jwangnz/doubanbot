@@ -40,7 +40,7 @@ def oauth_required(orig):
         else:
             hash = models.Authen.gen_authen_code(user.jid, session)
             link = "%s/%s" %(config.AUTH_URL, hash)
-            message = "Please use the link below to authorise the bot for fetching your douban data:\n%s" %link
+            message = "Please use the link below to authorize the bot for fetching your douban data:\n%s" %link
             prot.send_plain(user.jid, "You must authorization the bot before calling %s\n%s"
                 % (self.name, message))
     return every
@@ -151,7 +151,7 @@ class HelpCommand(BaseCommand):
     @oauth_required
     def __call__(self, user, prot, args, session):
         rv=[]
-        if args:
+        if args and args.strip():
             c=all_commands.get(args.strip().lower(), None)
             if c:
                 rv.append("Help for %s:\n" % c.name)
@@ -395,6 +395,21 @@ class AdminSubscribeCommand(BaseCommand):
     def __call__(self, user, prot, args, session):
         prot.send_plain(user.jid, "Subscribing " + args)
         protocol.presence_conn.subscribe(JID(args))
+
+class AdminRequestAuthCommand(BaseCommand):
+
+    def __init__(self):
+        super(AdminRequestAuthCommand, self).__init__('adm_auth',
+            "Send authorization request to a user.")
+
+    @admin_required
+    @arg_required()
+    def __call__(self, user, prot, args, session):
+        hash = models.Authen.gen_authen_code(args, session)
+        link = "%s/%s" %(config.AUTH_URL, hash)
+        message = "Please use the link below to authorize the bot for fetching your douban data:\n%s" %link
+        prot.send_plain(user.jid, "Sending authorization request to " + args)
+        prot.send_plain(args, message)
 
 for __t in (t for t in globals().values() if isinstance(type, type(t))):
     if BaseCommand in __t.__mro__:
