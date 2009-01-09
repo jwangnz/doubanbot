@@ -10,13 +10,15 @@ import urlparse
 from twisted.python import log
 from twisted.internet import defer
 from twisted.words.xish import domish
-from twisted.web import microdom, client
+from twisted.words.protocols.jabber.jid import JID
+from twisted.web import client
 from sqlalchemy.orm import exc
 
 import models
 import config
 import doubanapi
 import scheduling
+import protocol
 
 all_commands={}
 
@@ -140,21 +142,6 @@ class StatusCommand(BaseStatusCommand):
     def __call__(self, user, prot, args, session):
         prot.send_plain(user.jid, self.get_user_status(user))
 
-
-class AdminUserStatusCommand(BaseStatusCommand):
- 
-    def __init__(self):
-        super(AdminUserStatusCommand, self).__init__('adm_status',
-            "Check a user's status.")
- 
-    @admin_required
-    @arg_required()
-    def __call__(self, user, prot, args, session):
-        try:
-            u=models.User.by_jid(args, session)
-            prot.send_plain(user.jid, self.get_user_status(u))
-        except Exception, e:
-            prot.send_plain(user.jid, "Failed to load user: " + str(e))
 
 class HelpCommand(BaseCommand):
 
@@ -381,6 +368,33 @@ Example, quiet for on hour:
         else:
             prot.send_plain(user.jid, "I don't understand how long you want "
                 "me to be quiet.  Try: quiet 5m")
+
+class AdminUserStatusCommand(BaseStatusCommand):
+ 
+    def __init__(self):
+        super(AdminUserStatusCommand, self).__init__('adm_status',
+            "Check a user's status.")
+ 
+    @admin_required
+    @arg_required()
+    def __call__(self, user, prot, args, session):
+        try:
+            u=models.User.by_jid(args, session)
+            prot.send_plain(user.jid, self.get_user_status(u))
+        except Exception, e:
+            prot.send_plain(user.jid, "Failed to load user: " + str(e))
+
+class AdminSubscribeCommand(BaseCommand):
+ 
+    def __init__(self):
+        super(AdminSubscribeCommand, self).__init__('adm_subscribe',
+            'Subscribe a user.')
+ 
+    @admin_required
+    @arg_required()
+    def __call__(self, user, prot, args, session):
+        prot.send_plain(user.jid, "Subscribing " + args)
+        protocol.presence_conn.subscribe(JID(args))
 
 for __t in (t for t in globals().values() if isinstance(type, type(t))):
     if BaseCommand in __t.__mro__:
