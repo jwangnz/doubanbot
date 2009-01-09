@@ -113,6 +113,8 @@ class BaseStatusCommand(BaseCommand):
             % {True: 'Active', False: 'Inactive'}[user.active])
         rv.append("Autopost status: %s"
             % {True: 'Active', False: 'Inactive'}[user.auto_post])
+        rv.append("Douban OAuth status: %s"
+            % {True: 'Active', False: 'Inactive'}[user.auth])
         resources = scheduling.resources(user.jid)
         if resources:
             rv.append("I see you logged in with the following resources:")
