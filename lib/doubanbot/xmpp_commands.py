@@ -1,3 +1,5 @@
+from __future__ import with_statement
+
 import time
 import datetime
 import re
@@ -100,17 +102,12 @@ class ReauthCommand(BaseCommand):
         except:
             log.msg(":(, reauth user: user.jid failed")
 
-class StatusCommand(BaseCommand):
+class BaseStatusCommand(BaseCommand):
 
-    def __init__(self):
-        super(StatusCommand, self).__init__('status', 'Check your status.')
-
-    @oauth_required
-    def __call__(self, user, prot, args, session):
-        rv=[]
+    def get_user_status(self, user):
+        rv = []
         rv.append("Jid:  %s" % user.jid)
-        rv.append("Jabber status:  %s" % user.status)
-        rv.append("Notify status:  %s"
+        rv.append("Notification status: %s"
             % {True: 'Active', False: 'Inactive'}[user.active])
         rv.append("Autopost status: %s"
             % {True: 'Active', False: 'Inactive'}[user.auto_post])
@@ -124,14 +121,40 @@ class StatusCommand(BaseCommand):
                 "a message to.  Perhaps you're dnd, xa, or negative priority.")
         if user.is_quiet():
             rv.append("All alerts are quieted until %s" % str(user.quiet_until))
-        if user.jid in config.ADMINS:
-            auth_user = session.query(models.User).filter_by(auth=True).count()
-            rv.append("Authorized user: %s" %auth_user)
-            auth_active_user = session.query(models.User).filter_by(auth=True).filter_by(active=True).count()
-            rv.append("Active user: %s" %auth_active_user)
-            online_user = scheduling.online_users_count()
-            rv.append("Online user: %s" %online_user)
-        prot.send_plain(user.jid, "\n".join(rv))
+        if user.is_admin:
+            with models.Session() as session:
+                auth_user = session.query(models.User).filter_by(auth=True).count()
+                rv.append("Authorized user: %s" %auth_user)
+                auth_active_user = session.query(models.User).filter_by(auth=True).filter_by(active=True).count()
+                rv.append("Active user: %s" %auth_active_user) 
+                online_user = scheduling.online_users_count()
+                rv.append("Online user: %s" %online_user)
+        return "\n".join(rv)
+
+class StatusCommand(BaseStatusCommand):
+    
+    def __init__(self):
+        super(StatusCommand, self).__init__('status', 'Check your status.')
+
+    @oauth_required
+    def __call__(self, user, prot, args, session):
+        prot.send_plain(user.jid, self.get_user_status(user))
+
+
+class AdminUserStatusCommand(BaseStatusCommand):
+ 
+    def __init__(self):
+        super(AdminUserStatusCommand, self).__init__('adm_status',
+            "Check a user's status.")
+ 
+    @admin_required
+    @arg_required()
+    def __call__(self, user, prot, args, session):
+        try:
+            u=models.User.by_jid(args, session)
+            prot.send_plain(user.jid, self.get_user_status(u))
+        except Exception, e:
+            prot.send_plain(user.jid, "Failed to load user: " + str(e))
 
 class HelpCommand(BaseCommand):
 
