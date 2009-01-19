@@ -135,8 +135,10 @@ class Entry(object):
     @property
     @_entry_check
     def authorId(self):
-        # can't get it in atom.Author, shit 
-        pass
+        id = re.search('^.*\/(\d+)$', self.entry.author[0].uri.text)
+        if id:
+            return int(id.group(1))
+        return None
         
     @property
     @_entry_check
