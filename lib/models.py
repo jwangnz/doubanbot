@@ -74,19 +74,6 @@ class User(object):
             if not session:
                 s.close()
 
-    @staticmethod
-    def to_check(session, timeout=1):
-        query = """select * from users
-                    where users.active = :uactive 
-                    and users.auth = :uauth
-                    and users.status not in ('dnd', 'offline', 'unavailable', 'unsubscribed')
-                    and (users.last_check is null or users.last_check < :ulast_check)
-                    limit 50
-                """
-        then = datetime.datetime.now() - datetime.timedelta(minutes=timeout)
-        return session.query(User).from_statement(query).params(
-            uactive=True, uauth=True, ulast_check=then)
-        
 
 class Authen(object):
     def __init__(self, jid, hash):
@@ -150,6 +137,7 @@ class Token(object):
 _users_table = Table('users', _metadata,
     Column('jid', String(128), primary_key=True, index=True, unique=True),
     Column('uid', String(128), index=True),
+    Column('nid', Integer, index=True),
     Column('key', String(32)),
     Column('secret', String(16)),
     Column('name', String(255)),
@@ -160,7 +148,6 @@ _users_table = Table('users', _metadata,
     Column('auto_post', Boolean, default=False),
     Column('quiet_until', DateTime),
     Column('create_date', DateTime, default=datetime.datetime.now),
-    Column('last_check', DateTime),
     Column('last_cb_id', Integer),
     Column('last_dm_id', Integer),
     Column('last_modified', DateTime, onupdate=datetime.datetime.now),

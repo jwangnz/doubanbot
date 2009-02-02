@@ -33,7 +33,7 @@ class UserStuff(JidSet):
         self.last_dm_id = last_dm_id
 
         self.uid = None
-        self.name = None
+        self.nid = None
         self.key = None
         self.secret = None
         self.auth = None
@@ -109,7 +109,7 @@ class UserStuff(JidSet):
             entry_id = int(entry.id) 
             if entry_id > self.last_cb_id:
                 self.last_cb_id = entry_id
-                if self.name == entry.authorName.decode('utf-8'):
+                if self.nid == entry.authorId:
                     continue
                 plain = "%s: %s " % (entry.authorName.decode('utf-8'), entry.title.decode('utf-8'))
                 html = "<a href=\"%s\">%s</a>: %s" % (entry.authorLink, entry.authorName.decode('utf-8'), entry.htmlContent.decode('utf-8'))
@@ -224,14 +224,14 @@ class UserRegistry(object):
             self.users[short_jid] = UserStuff(short_jid, last_cb_id, last_dm_id)
         self.users[short_jid].add(full_jid)
 
-    def set_creds(self, short_jid, uid, name, key, secret, quiet_until):
+    def set_creds(self, short_jid, uid, nid, key, secret, quiet_until):
         u = self.users.get(short_jid)
         if not u:
             log.msg("Couldn't find %s to set creds" % short_jid)
             return
 
         u.uid = uid
-        u.name = name
+        u.nid = nid
         u.key = key
         u.secret = secret
         u.quiet_until = quiet_until
@@ -281,7 +281,7 @@ def _load_user(entity, session):
         u = models.User.update_status(jid, None, session)
     if u.active is False or u.auth is False:
         return ((u.last_cb_id, u.last_dm_id), ('', '', '', '', u.quiet_until))
-    return ((u.last_cb_id, u.last_dm_id), (u.uid, u.name, u.key, u.secret, u.quiet_until))
+    return ((u.last_cb_id, u.last_dm_id), (u.uid, u.nid, u.key, u.secret, u.quiet_until))
 
 def _init_user(u, short_jid, full_jids):
     if u:

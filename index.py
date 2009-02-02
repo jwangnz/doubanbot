@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys, os, inspect
+import sys, os, inspect, re
 path = os.path.dirname(inspect.currentframe().f_code.co_filename) or '.'
 os.chdir(path)
 sys.path.append(path)
@@ -12,9 +12,9 @@ from doubanbot import config
 
 urls = (
  '[/]+', 'index',
- '/douban/subscribe/([^\/]+)', 'subscribe',
- '/douban/auth/([a-zA-Z0-9]{32})', 'auth',
- '/douban/callback.*', 'callback',
+ '/bot/subscribe/([^\/]+)', 'subscribe',
+ '/bot/auth/([a-zA-Z0-9]{32})', 'auth',
+ '/bot/callback.*', 'callback',
 )
 
 
@@ -102,6 +102,9 @@ class callback:
         user.jid = authen.jid
         user.uid = people.uid.text
         user.name = people.title.text
+        match = re.search('^.*\/(\d+)$', people.GetSelfLink().href)
+        if match: 
+            user.nid = match.group(1)
         user.auth = True
         user.key = access_key
         user.secret = access_secret
