@@ -314,6 +314,11 @@ class OnCommand(BaseCommand):
     @oauth_required
     def __call__(self, user, prot, args, session):
         user.active=True
+        try:
+            session.add(user)
+            session.commit()
+        except:
+            log.err()
         scheduling.enable_user(user.jid)
         prot.send_plain(user.jid, "Notify enabled.")
 
