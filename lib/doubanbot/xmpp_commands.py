@@ -311,6 +311,7 @@ class OnCommand(BaseCommand):
     def __init__(self):
         super(OnCommand, self).__init__('on', 'Enable notify.')
 
+    @oauth_required
     def __call__(self, user, prot, args, session):
         user.active=True
         scheduling.enable_user(user.jid)
@@ -320,6 +321,7 @@ class OffCommand(BaseCommand):
     def __init__(self):
         super(OffCommand, self).__init__('off', 'Disable notify.')
 
+    @oauth_required
     def __call__(self, user, prot, args, session):
         user.active=False
         scheduling.disable_user(user.jid)
