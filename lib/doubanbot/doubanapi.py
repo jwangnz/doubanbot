@@ -107,6 +107,18 @@ class Douban(object):
     def getDoumail(self, id, args=None):
         return self.__parsed(self.__get("/doumail/%s" % str(id), args), douban.DoumailEntryFromString)
 
+    def addDoumail(self, to, subject, body, captacha_token=None, captacha_string=None):
+        entry = douban.DoumailEntry() 
+        receiverURI = "http://api.douban.com/people/%s" % to
+        entry.entity.append(douban.Entity('receiver', "",extension_elements=[atom.Uri(text=receiverURI)]))
+        entry.title = atom.Title(text=subject)
+        entry.content = atom.Content(text=body)
+        if captacha_token:
+            entry.attribute.append(douban.Attribute('captacha_token', captacha_token))
+        if captacha_string:
+            entry.attribute.append(douban.Attribute('captacha_string', captacha_string))
+        return self.__post("/doumails", entry.ToString())
+
 def _entry_check(orig):
     def every(self):
         if not isinstance(self.entry, gdata.GDataEntry):
