@@ -79,6 +79,23 @@ class Authen(object):
     def __init__(self, jid, hash):
         self.jid = jid
         self.hash = hash
+    
+    @staticmethod
+    def welcome_message(jid, session=None):
+        s = session
+        if not s:
+            s = Session()
+        welcome_message = """Welcome to DoubanBot.
+Here you can use your normal IM client to post messages or recommend urls to douban, track contacts broadcasting, doumail notify from douban, and more.
+
+Please use the link below to authorize the bot for fetching you douban data.
+%s
+"""
+        hash = Authen.gen_authen_code(jid, session)
+        auth_url = "%s/%s" %(config.AUTH_URL, hash)
+        if session: 
+            s.close()
+        return welcome_message % auth_url
 
     @staticmethod
     def get_authen_code(jid, session=None):

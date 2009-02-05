@@ -26,7 +26,7 @@ application = service.Application(config.NAME)
 xmppclient = XMPPClient(jid.internJID(config.SCREEN_NAME), config.CONF.get('xmpp', 'pass'))
 xmppclient.logTraffic = False
 
-protocols = [protocol.DoubanbotPresenceProtocol, protocol.DoubanbotMessageProtocol]
+protocols = [protocol.DoubanbotRosterProtocol, protocol.DoubanbotPresenceProtocol, protocol.DoubanbotMessageProtocol ]
 for p in protocols:
     handler = p()
     handler.setHandlerParent(xmppclient)

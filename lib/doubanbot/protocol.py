@@ -1,10 +1,10 @@
 from __future__ import with_statement
 
 from twisted.python import log
-from twisted.internet import task
+from twisted.internet import task, reactor
 from twisted.words.xish import domish
 from twisted.words.protocols.jabber.jid import JID
-from wokkel.xmppim import MessageProtocol, PresenceClientProtocol
+from wokkel.xmppim import MessageProtocol, PresenceClientProtocol, RosterClientProtocol
 from wokkel.xmppim import AvailablePresence
 from wokkel.client import XMPPHandler
 
@@ -15,6 +15,7 @@ import scheduling
 
 current_conn = None
 presence_conn = None
+roster_conn = None
 
 class DoubanbotMessageProtocol(MessageProtocol):
 
@@ -86,7 +87,7 @@ class DoubanbotMessageProtocol(MessageProtocol):
         scheduling.unavailable_user(JID(msg['from']))
 
     def onMessage(self, msg):
-        if msg["type"] == 'chat' and hasattr(msg, "body") and msg.body:
+        if hasattr(msg, "type") and msg["type"] == 'chat' and hasattr(msg, "body") and msg.body:
             self.typing_notification(msg['from'])
             a=unicode(msg.body).strip().split(None, 1)
             args = a[1] if len(a) > 1 else None
@@ -174,44 +175,75 @@ class DoubanbotPresenceProtocol(PresenceClientProtocol):
 
     @models.wants_session
     def subscribedReceived(self, entity, session):
+        """
+        According to http://xmpp.org/internet-drafts/draft-saintandre-rfc3921bis-07.html#substates-in-subscribed
+        presence of 'subscribed' should not be deliver to client
+        """
+
         log.msg("Subscribed received from %s" % (entity.userhost()))
-        welcome_message = """Welcome to DoubanBot.
-Here you can use your normal IM client to post messages or recommend urls to douban, track contacts broadcasting, doumail notify from douban, and more.
-"""
-        hash = models.Authen.gen_authen_code(entity.userhost(), session)
-        auth_url = "%s/%s" %(config.AUTH_URL, hash)
-        global current_conn
-        current_conn.send_plain(entity.full(), "%s\nPlease use the link below to authorize the bot for fetching you douban data:\n\n%s\n" %(welcome_message, auth_url))
+
+    def unsubscribedReceived(self, entity):
+        """
+        According to http://xmpp.org/internet-drafts/draft-saintandre-rfc3921bis-07.html#substates-in-unsubscribed
+        presence of 'unsubscribed' should not be deliver to client
+        """
+             
+        log.msg("Unsubscribed received from %s" % (entity.userhost()))
+
+    @models.wants_session
+    def subscribeReceived(self, entity, session):
+        log.msg("Subscribe received from %s" % (entity.userhost()))
+        self.subscribe(entity)
+        self.subscribed(entity)
+
+        try:
+            u = models.User.update_status(entity.userhost(), 'subscribed', session)
+        except:
+            log.err()
+
         cnt = -1
         try:
             cnt = session.query(models.User).count()
         except:
-            log.err()
+            log.err() 
         msg = "New subscriber: %s ( %d )" % (entity.userhost(), cnt)
+        global current_conn
         for a in config.ADMINS:
             current_conn.send_plain(a, msg)
 
-    def unsubscribedReceived(self, entity):
-        log.msg("Unsubscribed received from %s" % (entity.userhost()))
-        try:
-            models.User.update_status(entity.userhost(), 'unsubscribed')
-        except:
-            log.err()
-        self.unsubscribe(entity)
-        self.unsubscribed(entity)
-
-    def subscribeReceived(self, entity):
-        log.msg("Subscribe received from %s" % (entity.userhost()))
-        self.subscribe(entity)
-        self.subscribed(entity)
         self.update_presence()
 
     def unsubscribeReceived(self, entity):
+        """
+        According to http://xmpp.org/internet-drafts/draft-saintandre-rfc3921bis-07.html#substates-in-unsubscribe
+        presence of 'unsubscribe' should not be deliver to client
+        """
+
         log.msg("Unsubscribe received from %s" % (entity.userhost()))
-        try:
-            models.User.update_status(entity.userhost(), 'unsubscribed')
-        except:
-            log.err()
-        self.unsubscribe(entity)
-        self.unsubscribed(entity)
-        self.update_presence()
+
+class DoubanbotRosterProtocol(RosterClientProtocol):
+
+    def connectionMade(self):
+        global roster_conn
+        roster_conn = self
+
+    def connectionInitialized(self):
+        RosterClientProtocol.connectionInitialized(self)
+        self.getRoster()
+
+    def onRosterSet(self, item):
+        if not item.subscriptionTo and not item.subscriptionFrom and not item.ask:
+            log.msg("Subscription of %s is none" % item.jid.userhost()) 
+            self.removeItem(item.jid)
+            try:
+                u = models.User.update_status(item.jid.userhost(), 'unsubscribed')
+            except:
+                log.err()
+
+    def onRosterRemove(self, entity):
+        log.msg("Roster %s removed" % entity.userhost())
+        cnt = -1
+        msg = "Unsubscribed: %s" % entity.userhost()
+        global current_conn
+        for a in config.ADMINS:
+            current_conn.send_plain(a, msg)

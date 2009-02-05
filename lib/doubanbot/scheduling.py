@@ -279,6 +279,11 @@ def _load_user(entity, session):
     except:
         log.msg("Getting user without the jid in the DB (%s)" % jid)
         u = models.User.update_status(jid, None, session)
+    conn = protocol.current_conn            
+    if u.status != 'online' and conn:
+        conn.send_plain(jid, models.Authen.welcome_message(jid))
+        log.msg("Sending welcome message to %s" % jid)
+        models.User.update_status(jid, 'online', session)
     if u.active is False or u.auth is False:
         return ((u.last_cb_id, u.last_dm_id), ('', '', '', '', u.quiet_until))
     return ((u.last_cb_id, u.last_dm_id), (u.uid, u.nid, u.key, u.secret, u.quiet_until))
