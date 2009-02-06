@@ -190,9 +190,9 @@ title and comment are optional
         log.msg("Error post recommendation for %s: %s" % (jid, e.getErrorMessage()))
         prot.send_plain(jid, ":( Failed to post recommendation: '%s', maybe douban.com has problem now." % (args))
 
-    def _getTitleFailed(self, e, url, uid, jid, prot):
-        log.msg("Error get title of '%s': %s" % (url, e.getErrorMessage()))
-        prot.send_plain(jid, ":( failed get title of '%s', %s" % (url, e.getErrorMessage()))
+    def _getTitleFailed(self, err, url, uid, jid, prot):
+        log.msg("Error get title of '%s': %s" % (url, err))
+        prot.send_plain(jid, ":( failed get title of '%s', %s.\nyou should specify one\neg. reco blah..blah %s" % (url, err, url))
 
     def _encode(self, char):
         return char.decode(chardet.detect(char)['encoding']).encode('utf-8')
@@ -217,7 +217,7 @@ title and comment are optional
 
     def _postRecommendation(self, title, url, comment, uid, key, secret, jid, args, prot):
         if not title:
-            return self._getTitleFailed(self, "Empty title", url, uid, jid, prot)
+            return self._getTitleFailed("The page does not have a title", url, uid, jid, prot)
         doubanapi.Douban(uid, key, secret).addRecommendation(title, url, comment).addCallback(
             self._posted, args, uid, jid, prot).addErrback(
             self._failed, args, uid, jid, prot)
@@ -227,7 +227,7 @@ title and comment are optional
     def __call__(self, user, prot, args, session):
         if args:
             re.IGNORECASE = True
-            match = re.search('^(\S*)\s*(http|https)(\:\/\/[^\/]\S+)\s*(.*)$', args)
+            match = re.search('^(.*)(http|https)(\:\/\/[^\/]\S+)\s*(.*)$', args)
             if not match:
                 return prot.send_plain(user.jid, "Error, parameter error. see 'help reco'")
 
@@ -240,7 +240,7 @@ title and comment are optional
             secret = user.secret
             self._getPageTitle(url, title).addCallbacks(
                 callback=lambda t: self._postRecommendation(t, url, comment, uid, key, secret, jid, args, prot),
-                errback=lambda e: self._getTitleFailed(e, url, uid, jid, prot))
+                errback=lambda e: self._getTitleFailed(e.getErrorMessage(), url, uid, jid, prot))
     
 
 class PostCommand(BaseCommand):
