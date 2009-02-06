@@ -279,14 +279,37 @@ def _load_user(entity, session):
     except:
         log.msg("Getting user without the jid in the DB (%s)" % jid)
         u = models.User.update_status(jid, None, session)
-    conn = protocol.current_conn            
-    if u.status != 'online' and conn:
-        conn.send_plain(jid, models.Authen.welcome_message(jid))
+
+    def send_welcome(jid):
+        protocol.current_conn.send_plain(jid, models.Authen.welcome_message(jid)) 
         log.msg("Sending welcome message to %s" % jid)
+
+    def tokenInvalid(err):
+        log.msg("Access token of %s on behalf of %s is invalid" % (u.jid, u.uid))
+        u.auth = False
+        try:
+            session.add(u)
+            session.commit()
+        except:
+            log.err()
+        send_welcome(u.jid)
+
+    def tokenValid(p):
+        log.msg("Access token of %s on behalf of %s is valid" % (u.jid, u.uid))
+        if u.active:
+            enable_user(jid)
+
+    if u.status != 'online':
+        if u.auth and u.key and u.secret and u.uid:
+            log.msg("Validating access_token for %s" % u.uid)
+            doubanapi.Douban(u.uid, u.key, u.secret).validateToken().addCallback(
+                tokenValid).addErrback(tokenInvalid)
+        else:
+            send_welcome(u.jid)
         models.User.update_status(jid, 'online', session)
-    if u.active is False or u.auth is False:
-        return ((u.last_cb_id, u.last_dm_id), ('', '', '', '', u.quiet_until))
-    return ((u.last_cb_id, u.last_dm_id), (u.uid, u.nid, u.key, u.secret, u.quiet_until))
+    elif u.active and u.auth:
+        return ((u.last_cb_id, u.last_dm_id), (u.uid, u.nid, u.key, u.secret, u.quiet_until))
+    return ((u.last_cb_id, u.last_dm_id), ('', '', '', '', u.quiet_until))
 
 def _init_user(u, short_jid, full_jids):
     if u:

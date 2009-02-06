@@ -8,6 +8,7 @@ from twisted.internet import defer
 from twisted.web import client
 
 BASE_URL = 'http://api.douban.com'
+AUTH_URL = 'http://www.douban.com/service/auth/access_token/'
 API_KEY  = ''
 API_SECRET = ''
 
@@ -118,6 +119,11 @@ class Douban(object):
         if captacha_string:
             entry.attribute.append(douban.Attribute('captacha_string', captacha_string))
         return self.__post("/doumails", entry.ToString())
+
+    def validateToken(self):
+        url = "%s%s" % (AUTH_URL, str(self.key))
+        return client.getPage(url, method='GET', timeout=TIMEOUT, agent=self.agent, headers=self.__makeAuthHeader('GET', url))
+
 
 def _entry_check(orig):
     def every(self):

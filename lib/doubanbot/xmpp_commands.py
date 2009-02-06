@@ -422,6 +422,43 @@ class AdminRequestAuthCommand(BaseCommand):
         prot.send_plain(user.jid, "Sending authorization request to " + args)
         prot.send_plain(args, message)
 
+class AdminOAuthCheckCommand(BaseCommand):
+
+    def __init__(self):
+        super(AdminOAuthCheckCommand, self).__init__('adm_oauth',
+            "Validate access_token of a user.")
+
+    def _valid(self, p, jid, uid, prot):
+        prot.send_plain(jid, "Access token of %s on behalf of %s is valid" % (jid, uid))
+
+    def _invalid(self, e, admin, jid, uid, prot, session, u):
+        err = e.getErrorMessage()
+        if err.find('401') == -1:
+            prot.send_plain(admin, "Access token validation of %s on behalf of %s failed, %s" % (jid, uid, err))
+        else:
+            msg = "Access token of %s on behalf of %s is invalid." % (jid, uid)
+            prot.send_plain(admin, msg + "\nSending auth request to " + jid)
+            msg = msg + " %s" % models.Authen.auth_message(jid)
+            prot.send_plain(jid, msg)
+            scheduling.disable_user(jid)
+            try:
+                u.auth = False
+                session.add(u)
+                session.commit()
+            except:
+                log.err()
+
+    @admin_required
+    @arg_required()
+    def __call__(self, user, prot, args, session):
+        try:
+            u = models.User.by_jid(args, session)
+            doubanapi.Douban(u.uid, u.key, u.secret).validateToken().addCallback(
+                self._valid, user.jid, u.jid, u.uid, prot).addErrback(self._invalid, user.jid, u.jid, u.uid, prot, session, u)
+        except Exception, e:
+            prot.send_plain(user.jid, "Failed to load user: " + str(e))
+
+
 for __t in (t for t in globals().values() if isinstance(type, type(t))):
     if BaseCommand in __t.__mro__:
         try:
