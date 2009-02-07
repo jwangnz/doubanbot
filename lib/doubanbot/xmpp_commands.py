@@ -428,8 +428,8 @@ class AdminOAuthCheckCommand(BaseCommand):
         super(AdminOAuthCheckCommand, self).__init__('adm_oauth',
             "Validate access_token of a user.")
 
-    def _valid(self, p, jid, uid, prot):
-        prot.send_plain(jid, "Access token of %s on behalf of %s is valid" % (jid, uid))
+    def _valid(self, p, admin, jid, uid, prot):
+        prot.send_plain(admin, "Access token of %s on behalf of %s is valid" % (jid, uid))
 
     def _invalid(self, e, admin, jid, uid, prot, session, u):
         err = e.getErrorMessage()
