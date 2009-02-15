@@ -458,6 +458,29 @@ class AdminOAuthCheckCommand(BaseCommand):
         except Exception, e:
             prot.send_plain(user.jid, "Failed to load user: " + str(e))
 
+class AdminBroadcastCommand(BaseCommand):
+ 
+    def __init__(self):
+        super(AdminBroadcastCommand, self).__init__('adm_broadcast',
+                                                    'Broadcast a message.')
+ 
+    @models.wants_session
+    def _load_users(self, session):
+        return [user.jid for user in session.query(models.User).filter(
+                models.User.status.in_(['online', 'away', 'dnd', 'xa']))]
+ 
+    def _do_broadcast(self, users, prot, jid, msg):
+        log.msg("Administrative broadcast from %s" % jid)
+        for j in users:
+            log.msg("Sending message to %s" % j)
+            prot.send_plain(j, msg)
+        prot.send_plain(jid, "Sent message to %d users" % len(users))
+ 
+    @admin_required
+    @arg_required()
+    def __call__(self, user, prot, args, session):
+        threads.deferToThread(self._load_users).addCallback(
+            self._do_broadcast, prot, user.jid, args)
 
 for __t in (t for t in globals().values() if isinstance(type, type(t))):
     if BaseCommand in __t.__mro__:
