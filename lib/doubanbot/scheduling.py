@@ -111,7 +111,10 @@ class UserStuff(JidSet):
                 self.last_cb_id = entry_id
                 if self.nid == entry.authorId:
                     continue
-                plain = "%s: %s " % (entry.authorName.decode('utf-8'), entry.title.decode('utf-8'))
+                if entry.isSignature:
+                    plain = "%s: %s " % (entry.authorName.decode('utf-8'), entry.htmlContent.decode('utf-8'))
+                else:
+                    plain = "%s: %s " % (entry.authorName.decode('utf-8'), entry.title.decode('utf-8'))
                 html = "<a href=\"%s\">%s</a>: %s" % (entry.authorLink, entry.authorName.decode('utf-8'), entry.htmlContent.decode('utf-8'))
                 comment = entry.comment
                 if comment: 

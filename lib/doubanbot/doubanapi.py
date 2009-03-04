@@ -224,4 +224,13 @@ class Entry(object):
     def htmlContent(self):
         return self.entry.content.text
 
+    @property
+    @_entry_check
+    def isSignature(self):
+        if hasattr(self.entry, 'category'):
+            for cate in self.entry.category:
+                if cate.term == 'http://www.douban.com/2007#miniblog.signature':
+                    return True
+                
+        return False
 
