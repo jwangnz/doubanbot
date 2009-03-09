@@ -241,6 +241,7 @@ class DoubanbotRosterProtocol(RosterClientProtocol):
         if not item.subscriptionTo and not item.subscriptionFrom and not item.ask:
             log.msg("Subscription of %s is none" % item.jid.userhost()) 
             self.removeItem(item.jid)
+            scheduling.unavailable_user(item.jid)
             try:
                 u = models.User.update_status(item.jid.userhost(), 'unsubscribed')
             except:
