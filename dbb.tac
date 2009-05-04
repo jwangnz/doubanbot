@@ -19,6 +19,7 @@ VERSION = commands.getoutput("git describe").strip()
 
 doubanapi.API_KEY = config.API_KEY
 doubanapi.API_SECRET = config.API_SECRET
+doubanapi.TIMEOUT = 10
 doubanapi.Douban.agent = "DoubanBot %s (%s)" % (VERSION, doubanapi.Douban.agent)
 
 application = service.Application(config.NAME)
