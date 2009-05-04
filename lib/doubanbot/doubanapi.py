@@ -8,7 +8,6 @@ from twisted.internet import defer
 from twisted.web import client
 
 BASE_URL = 'http://api.douban.com'
-AUTH_URL = 'http://www.douban.com/service/auth/access_token/'
 API_KEY  = ''
 API_SECRET = ''
 
@@ -121,8 +120,7 @@ class Douban(object):
         return self.__post("/doumails", entry.ToString())
 
     def validateToken(self):
-        url = "%s%s" % (AUTH_URL, str(self.key))
-        return client.getPage(url, method='GET', timeout=TIMEOUT, agent=self.agent, headers=self.__makeAuthHeader('GET', url))
+        return self.__get("/access_token/%s" %str(self.key))
 
 
 def _entry_check(orig):
